@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<!--
+  ~ Copyright 2018 Ben Peng
+  ~
+  ~ This program is free software: you can redistribute it and/or modify it under the
+  ~ terms of the GNU Lesser General Public License as published by the Free Software
+  ~ Foundation, either version 3 of the License, or (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful, but WITHOUT ANY
+  ~ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+  ~ PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU Lesser General Public License along with
+  ~ this program. If not, see <http://www.gnu.org/licenses/>.
+  -->
+
+<AnchorPane prefHeight="720.0" prefWidth="960.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="net.benpl.gpsutility.logger.PrimaryController">
+   <children>
+      <TabPane fx:id="tabPane" prefHeight="340.0" prefWidth="902.0" tabClosingPolicy="UNAVAILABLE" AnchorPane.leftAnchor="14.0" AnchorPane.rightAnchor="14.0" AnchorPane.topAnchor="14.0">
+        <tabs>
+          <Tab text="Device">
+            <content>
+              <AnchorPane fx:id="anchorPane" minHeight="0.0" minWidth="0.0" prefHeight="279.0" prefWidth="902.0">
+                     <children>
+                        <TitledPane animated="false" collapsible="false" prefHeight="253.0" prefWidth="705.0" text="Communication" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                          <content>
+                            <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="262.0" prefWidth="930.0">
+                                 <children>
+                                    <GridPane layoutX="14.0" layoutY="14.0" prefHeight="153.0" prefWidth="666.0">
+                                      <columnConstraints>
+                                        <ColumnConstraints halignment="RIGHT" hgrow="SOMETIMES" maxWidth="136.0" minWidth="10.0" prefWidth="86.0" />
+                                        <ColumnConstraints hgrow="SOMETIMES" maxWidth="196.0" minWidth="10.0" prefWidth="196.0" />
+                                          <ColumnConstraints halignment="RIGHT" hgrow="SOMETIMES" maxWidth="196.0" minWidth="10.0" prefWidth="96.0" />
+                                          <ColumnConstraints hgrow="SOMETIMES" maxWidth="296.0" minWidth="10.0" prefWidth="296.0" />
+                                      </columnConstraints>
+                                      <rowConstraints>
+                                        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                      </rowConstraints>
+                                       <children>
+                                          <Label text="Device:" />
+                                          <ComboBox fx:id="loggerChooser" onAction="#loggerChooserActionPerformed" prefWidth="150.0" GridPane.columnIndex="1">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" />
+                                             </GridPane.margin></ComboBox>
+                                          <ComboBox fx:id="baudRateChooser" prefWidth="150.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" />
+                                             </GridPane.margin></ComboBox>
+                                          <ComboBox fx:id="dataBitsChooser" prefWidth="150.0" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" />
+                                             </GridPane.margin></ComboBox>
+                                           <ComboBox fx:id="flowCtrlChooser" prefWidth="150.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" />
+                                             </GridPane.margin></ComboBox>
+                                          <Label text="Daud Rate:" GridPane.rowIndex="1" />
+                                          <Label text="Data Bits:" GridPane.rowIndex="2" />
+                                           <Label text="Flow Ctrl:" GridPane.rowIndex="3" />
+                                          <Label text="Serial Port:" GridPane.columnIndex="2" />
+                                          <Label text="Parity:" GridPane.columnIndex="2" GridPane.rowIndex="1" />
+                                          <Label text="Stop Bits:" GridPane.columnIndex="2" GridPane.rowIndex="2" />
+                                          <ComboBox fx:id="sPortChooser" onAction="#sPortChooserActionPerformed" prefHeight="23.0" prefWidth="277.0" GridPane.columnIndex="3">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" />
+                                             </GridPane.margin>
+                                          </ComboBox>
+                                          <ComboBox fx:id="parityChooser" prefWidth="150.0" GridPane.columnIndex="3" GridPane.rowIndex="1">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" />
+                                             </GridPane.margin>
+                                          </ComboBox>
+                                          <ComboBox fx:id="stopBitsChooser" prefWidth="150.0" GridPane.columnIndex="3" GridPane.rowIndex="2">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" />
+                                             </GridPane.margin>
+                                          </ComboBox>
+                                       </children>
+                                    </GridPane>
+                                    <Separator layoutY="166.0" prefWidth="200.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+                                    <GridPane layoutX="14.0" layoutY="169.0" prefHeight="107.0" prefWidth="884.0">
+                                      <columnConstraints>
+                                        <ColumnConstraints halignment="RIGHT" hgrow="SOMETIMES" maxWidth="120.0" minWidth="10.0" prefWidth="120.0" />
+                                        <ColumnConstraints hgrow="SOMETIMES" maxWidth="583.0" minWidth="10.0" prefWidth="473.0" />
+                                          <ColumnConstraints hgrow="SOMETIMES" maxWidth="143.0" minWidth="10.0" prefWidth="116.0" />
+                                          <ColumnConstraints hgrow="SOMETIMES" maxWidth="143.0" minWidth="0.0" prefWidth="72.0" />
+                                          <ColumnConstraints hgrow="SOMETIMES" maxWidth="124.0" minWidth="10.0" prefWidth="110.0" />
+                                      </columnConstraints>
+                                      <rowConstraints>
+                                        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                      </rowConstraints>
+                                       <children>
+                                          <Label text="NMEA Command:" />
+                                          <Label text="Upload Track To:" GridPane.rowIndex="1" />
+                                          <TextField fx:id="nmeaInput" disable="true" prefHeight="23.0" prefWidth="280.0" promptText="Data Field only (without '$', '*' and checksum)" GridPane.columnIndex="1">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" right="5.0" />
+                                             </GridPane.margin>
+                                          </TextField>
+                                          <TextField fx:id="uploadPath" disable="true" editable="false" onMouseReleased="#uploadPathOnClicked" prefHeight="23.0" prefWidth="288.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" right="5.0" />
+                                             </GridPane.margin>
+                                          </TextField>
+                                          <ProgressBar fx:id="uploadProgress" prefHeight="18.0" prefWidth="590.0" progress="0.0" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" right="5.0" />
+                                             </GridPane.margin>
+                                          </ProgressBar>
+                                          <Button fx:id="sendNmeaBtn" disable="true" mnemonicParsing="false" onAction="#sendNmeaBtnActionPerformed" text="Send" GridPane.columnIndex="3">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" />
+                                             </GridPane.margin>
+                                          </Button>
+                                          <Button fx:id="uploadTrackBtn" disable="true" mnemonicParsing="false" onAction="#uploadTrackBtnActionPerformed" text="Upload" GridPane.columnIndex="3" GridPane.rowIndex="1">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" />
+                                             </GridPane.margin>
+                                          </Button>
+                                          <Button disable="true" mnemonicParsing="false" text="Erase Logger" GridPane.columnIndex="4" GridPane.rowIndex="1">
+                                             <GridPane.margin>
+                                                <Insets left="5.0" />
+                                             </GridPane.margin>
+                                          </Button>
+                                          <HBox alignment="CENTER" prefHeight="100.0" prefWidth="200.0" GridPane.columnIndex="2" GridPane.rowIndex="1">
+                                             <children>
+                                                <CheckBox fx:id="gpxExport" disable="true" mnemonicParsing="false" onAction="#gpxExportActionPerformed" selected="true" text="GPX" />
+                                                <CheckBox fx:id="kmlExport" disable="true" mnemonicParsing="false" onAction="#kmlExportActionPerformed" text="KML" />
+                                             </children>
+                                          </HBox>
+                                       </children>
+                                    </GridPane>
+                                    <Button fx:id="connectBtn" layoutX="785.0" layoutY="79.0" mnemonicParsing="false" onAction="#connectBtnActionPerformed" text="Connect" />
+                                 </children>
+                              </AnchorPane>
+                          </content>
+                        </TitledPane>
+                     </children></AnchorPane>
+            </content>
+          </Tab>
+        </tabs>
+      </TabPane>
+      <TitledPane fx:id="logWindow" animated="false" collapsible="false" layoutX="14.0" layoutY="360.0" prefHeight="340.0" prefWidth="932.0" text="Logger - Disconnected." AnchorPane.bottomAnchor="14.0" AnchorPane.leftAnchor="14.0" AnchorPane.rightAnchor="14.0">
+        <content>
+          <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+               <children>
+                  <TextArea fx:id="logTextArea" editable="false" layoutX="18.6" layoutY="102.0" prefHeight="249.0" prefWidth="911.0" wrapText="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+                  <GridPane layoutX="669.0" layoutY="14.0" prefHeight="26.0" prefWidth="247.0">
+                    <columnConstraints>
+                      <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
+                      <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
+                        <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
+                    </columnConstraints>
+                    <rowConstraints>
+                      <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                    </rowConstraints>
+                     <children>
+                        <RadioButton fx:id="errLogLevel" mnemonicParsing="false" text="Error" />
+                        <RadioButton fx:id="infoLogLevel" mnemonicParsing="false" selected="true" text="Info" GridPane.columnIndex="1" />
+                        <RadioButton fx:id="debugLogLevel" mnemonicParsing="false" text="Debug" GridPane.columnIndex="2" />
+                     </children>
+                  </GridPane>
+               </children>
+            </AnchorPane>
+        </content>
+      </TitledPane>
+   </children>
+</AnchorPane>

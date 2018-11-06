@@ -1,0 +1,52 @@
+/*
+ * Copyright 2018 Ben Peng
+ *
+ * This program is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU Lesser General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ * PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License along with
+ * this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+apply plugin: 'java'
+apply plugin: 'application'
+apply plugin: 'distribution'
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+compileJava.options.encoding = 'UTF-8'
+
+buildscript {
+    repositories {
+        maven {
+            url = "http://localhost:8081/repository/maven-public"
+        }
+    }
+}
+
+repositories {
+    maven {
+        url = "http://localhost:8081/repository/maven-public"
+    }
+}
+
+dependencies {
+    implementation "com.fazecast:jSerialComm:2.3.0"
+    implementation "javax.xml.bind:jaxb-api:2.3.1"
+    implementation "com.sun.xml.bind:jaxb-impl:2.3.1"
+    implementation "com.sun.xml.bind:jaxb-core:2.3.0.1"
+    implementation "javax.xml.stream:stax-api:1.0-2"
+}
+
+mainClassName = "net.benpl.gpsutility.AppEntry"
+
+distributions {
+    main {
+        baseName = 'GPSUtility'
+    }
+}

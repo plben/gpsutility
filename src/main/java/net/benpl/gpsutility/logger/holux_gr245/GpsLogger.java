@@ -32,11 +32,12 @@ import java.util.stream.Stream;
 
 /**
  * Holux GR-245 GPS Logger entity inherited from {@link net.benpl.gpsutility.logger.GpsLogger}.
+ * <p>
+ * - Add USB_MODE support                   2018-11-07 Ben Peng
  */
 public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 
-    // FIXME: Need GR-245 specific NMEA commands
-//    private static final int STATE_USB_MODE = 2001;
+    private static final int STATE_USB_MODE = 2001;
 
     /**
      * Logger ID should be returned by external Logger within 'PHLX852'.
@@ -90,8 +91,8 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 //     * The controller of associated Config Panel
 //     */
 //    private Controller configPaneController;
-//
-//    private final USBMode usbMode = new USBMode();
+
+    private final USBMode usbMode = new USBMode();
 
     public GpsLogger() {
         // 38400/8bits/No Parity/1bit/No Flow Control
@@ -152,8 +153,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
             // Once SerialPort is ready, launch a batch of NMEA commands.
             loggerThread.enqueueSendJob(
                     new SendJob(this, "Handshake", "PHLX810", "PHLX852"), // Query logger for module ID
-                    // FIXME: Need GR-245 specific NMEA commands
-//                    new SendJob(this, "Switch to USB-Mode", "HOLUX241,1", "HOLUX001,1"), // Transit HoluxM241 into USB_MODE; Stop logging if started (TODO: Is it PHLX826->PHLX859 for GR245???)
+                    new SendJob(this, "Switch to USB-Mode", "PHLX826", "PHLX859"),
                     new SendJob(this, "Query SPI status", "PMTK182,2,1", "PMTK182,3,1"), // Query HoluxM241 for SPI status
                     new SendJob(this, "Query FmtReg", "PMTK182,2,2", "PMTK182,3,2"), // Query HoluxGR245 for log format register
                     new SendJob(this, "Query BySec", "PMTK182,2,3", "PMTK182,3,3"), // Query HoluxGR245 for interval (in 0.1 second) of BySEC
@@ -185,9 +185,9 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 //        fwVer = "";
 //        configPaneController = null;
 //        configPane = null;
-//
-//        // Cancel any pending USB_MODE TimerTask
-//        usbMode.exit();
+
+        // Cancel any pending USB_MODE TimerTask
+        usbMode.exit();
     }
 
     /**
@@ -235,6 +235,29 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 
                     // Transit logger state to HANDSHAKED
                     loggerState = STATE_HANDSHAKED;
+                    return true;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>("PHLX859", new NmeaHandler<GpsLogger>() {
+                @Override
+                public boolean handle(GpsLogger logger, String[] segs, int idx) {
+                    // Transit SM to USB_MODE state
+                    loggerState = STATE_USB_MODE;
+                    // Schedule TimerTask to keep USB_MODE alive.
+                    usbMode.keepAlive();
+                    return true;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>("PHLX860", new NmeaHandler<GpsLogger>() {
+                @Override
+                public boolean handle(GpsLogger logger, String[] segs, int idx) {
+                    // Transit SM to SERIALPORT_READY state
+                    loggerState = STATE_SERIALPORT_OPENED;
+
+                    if (loggerTask instanceof LoggerTask.Disconnect) {
+                        postDisconnect();
+                    }
+
                     return true;
                 }
             }),
@@ -542,17 +565,15 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 
     @Override
     protected boolean preDisconnect() {
-        // FIXME: Need GR-245 specific NMEA commands
-//        if (loggerState == STATE_USB_MODE) {
-//            // If in USB_MODE, transit HOLUX M-241 out of it.
-//            loggerThread.enqueueSendJob(
-//                    new SendJob(this, "Exit USB-Mode", "HOLUX241,2", "HOLUX001,2") // Transit HoluxM241 out from USB_MODE (TODO: Is it PHLX827->PHLX860 for GR245???)
-//            );
-//            return false;
-//        } else {
-//            return true;
-//        }
-        return true;
+        if (loggerState == STATE_USB_MODE) {
+            // If in USB_MODE, transit HOLUX GR-245 out of it.
+            loggerThread.enqueueSendJob(
+                    new SendJob(this, "Exit USB-Mode", "PHLX827", "PHLX860") // Transit Holux GR-245 out from USB_MODE
+            );
+            return false;
+        } else {
+            return true;
+        }
     }
 
     @Override
@@ -614,38 +635,37 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 //        );
 //    }
 
-    // FIXME: Need GR-245 specific NMEA commands
-//    class USBMode {
-//
-//        private Timer timer = null;
-//
-//        /**
-//         * Keep USB_MODE alive by sending 'HOLUX241,6' repeatedly.
-//         */
-//        void keepAlive() {
-//            if (timer != null) {
-//                timer.cancel();
-//            }
-//
-//            timer = new Timer("Timer-UsbMode");
-//            timer.schedule(new TimerTask() {
-//                @Override
-//                public void run() {
-//                    loggerThread.enqueueSendJob(
-//                            new SendJob(GpsLogger.this, null, "HOLUX241,6", null) // HeartBeat with HOLUX M-241, to keep USB_MODE alive (TODO: What is for GR245???)
-//                    );
-//                }
-//            }, 6000, 6000);
-//        }
-//
-//        /**
-//         * Cancel pending TimerTask.
-//         */
-//        void exit() {
-//            if (timer != null) {
-//                timer.cancel();
-//                timer = null;
-//            }
-//        }
-//    }
+    class USBMode {
+
+        private Timer timer = null;
+
+        /**
+         * Keep USB_MODE alive by sending 'PHLX828' periodically.
+         */
+        void keepAlive() {
+            if (timer != null) {
+                timer.cancel();
+            }
+
+            timer = new Timer("Timer-UsbMode");
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    loggerThread.enqueueSendJob(
+                            new SendJob(GpsLogger.this, null, "PHLX828", null) // HeartBeat with HOLUX GR-245, to keep USB_MODE alive.
+                    );
+                }
+            }, 6000, 6000);
+        }
+
+        /**
+         * Cancel pending TimerTask.
+         */
+        void exit() {
+            if (timer != null) {
+                timer.cancel();
+                timer = null;
+            }
+        }
+    }
 }

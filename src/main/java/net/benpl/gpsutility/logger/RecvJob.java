@@ -113,19 +113,31 @@ final public class RecvJob implements Runnable {
                     break;
                 }
 
+                boolean expected = logger.sendJob != null && logger.sendJob.isRespExpected(dataField);
+                if (expected) {
+                    // If the expected response of last SendJob
+                    // Cancel the NoResp timer immediately, otherwise the long time NMEA handling (like export gpx/kml) may cause timeout.
+                    logger.sendJob.cancelNoRespTimer();
+                }
+
                 // Dispatch NMEA to relevant handler.
                 success = logger.dispatchNmea(dataField.split(","));
 
-                if (logger.sendJob != null && logger.sendJob.isRespExpected(dataField)) {
-                    // If the expected response of last SendJob
-
+                if (expected) {
                     // SendJob level
-                    if (Utils.isNotEmpty(logger.sendJob.desc))
+                    if (Utils.isNotEmpty(logger.sendJob.desc)) {
                         Logging.debugln("%s...%s", logger.sendJob.desc, success ? "success" : "failed");
-                    logger.sendJob.cancelNoRespTimer();
-                    logger.sendJob = null;
+                    }
 
-                    // LoggerTask level.
+                    // Task level
+                    // Task unrelated SendJob. Nothing to do.
+                    if (logger.sendJob instanceof SendJob.NonTask) {
+                        logger.sendJob = null;
+                        return;
+                    }
+
+                    // Task related SendJob. Need to determine if task is done.
+                    logger.sendJob = null;
                     if (logger.loggerTask != null) {
                         if (success) {
                             if (logger.isSendJobQueueEmpty()) {
@@ -137,7 +149,7 @@ final public class RecvJob implements Runnable {
                                 });
                             }
                         } else {
-                            Logging.infoln("%s...failed", logger.loggerTask.name);
+                            Logging.errorln("%s...failed", logger.loggerTask.name);
                             // LoggerThread will take care this failure case
                         }
                     }

@@ -303,6 +303,8 @@ public class PrimaryController implements IController, ILoggerStateListener {
                     sendNmeaBtn.setDisable(false);
                     uploadPath.setDisable(false);
                     uploadTrackBtn.setDisable(false);
+                    gpxExport.setDisable(false);
+                    kmlExport.setDisable(false);
                     connectBtn.setDisable(false);
                     connectBtn.setText("Disconnect");
 
@@ -548,6 +550,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
         uploadProgress.setProgress(0);
         uploadPath.setDisable(true);
         gpxExport.setDisable(true);
+        kmlExport.setDisable(true);
         uploadTrackBtn.setDisable(true);
         // Disable NMEA debug
         nmeaInput.setDisable(true);
@@ -578,6 +581,8 @@ public class PrimaryController implements IController, ILoggerStateListener {
         uploadTrackBtn.setDisable(true);
         nmeaInput.setDisable(true);
         sendNmeaBtn.setDisable(true);
+        gpxExport.setDisable(true);
+        kmlExport.setDisable(true);
         tabPane.getTabs().forEach(tab -> {
             if (tab.getContent() != anchorPane) tab.setDisable(true);
         });
@@ -592,6 +597,8 @@ public class PrimaryController implements IController, ILoggerStateListener {
         uploadTrackBtn.setDisable(false);
         nmeaInput.setDisable(false);
         sendNmeaBtn.setDisable(false);
+        gpxExport.setDisable(false);
+        kmlExport.setDisable(false);
         tabPane.getTabs().forEach(tab -> tab.setDisable(false));
     }
 

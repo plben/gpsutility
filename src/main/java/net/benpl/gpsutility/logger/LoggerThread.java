@@ -188,11 +188,8 @@ public final class LoggerThread extends Thread {
         ingressQueue.clear();
         egressQueue.clear();
 
-        // Cancel any pending TimerTask;
-        if (logger.sendJob != null) {
-            logger.sendJob.cancelNoRespTimer();
-            logger.sendJob = null;
-        }
+        logger.loggerThread = null;
+        logger.resetLogger();
 
         Logging.infoln("Thread [%s]...stopped", logger.loggerName);
         Logging.infoln("...disconnected.");

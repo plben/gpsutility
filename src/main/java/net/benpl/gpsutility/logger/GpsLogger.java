@@ -19,11 +19,13 @@ import javafx.application.Platform;
 import javafx.scene.layout.AnchorPane;
 import net.benpl.gpsutility.export.ExportType;
 import net.benpl.gpsutility.misc.Logging;
+import net.benpl.gpsutility.misc.Utils;
 import net.benpl.gpsutility.serialport.SPort;
 import net.benpl.gpsutility.serialport.SPortProperty;
 import net.benpl.gpsutility.type.ILoggerStateListener;
 import net.benpl.gpsutility.type.INmeaListener;
 
+import java.text.SimpleDateFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 
@@ -32,6 +34,8 @@ import java.util.List;
  * It talks with external real GPS Logger via bound serial port, and notifies controller on task execution success/failure/progress/...
  */
 abstract public class GpsLogger implements INmeaListener {
+
+    protected static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
 
     protected static final int STATE_IDLE = 1001;
     protected static final int STATE_SERIALPORT_OPENING = 1002;
@@ -55,7 +59,7 @@ abstract public class GpsLogger implements INmeaListener {
     protected int serialPortFlowCtrlIdx = 2; // None
 
     protected LoggerThread loggerThread;
-    SendJob sendJob;
+    protected SendJob sendJob;
     protected LoggerTask loggerTask;
     protected ILoggerStateListener loggerStateListener;
 
@@ -167,7 +171,7 @@ abstract public class GpsLogger implements INmeaListener {
      * Call hook invoked by {@link LoggerTask.Disconnect#run(GpsLogger)} and somewhere else of multi-steps DisconnectLogger procedure.
      */
     protected void postDisconnect() {
-        // Notify success of DisconnectLogger.
+        // Task level
         if (loggerTask instanceof LoggerTask.Disconnect) {
             Logging.infoln("%s...success", loggerTask.name);
             LoggerTask task = loggerTask;
@@ -175,13 +179,12 @@ abstract public class GpsLogger implements INmeaListener {
             loggerTask = null;
         }
 
-        if (sendJob != null) {
-            sendJob.cancelNoRespTimer();
-            sendJob = null;
-        }
+        // Stop LoggerThread
+        loggerThread.stopThread();
+    }
 
-        // Reset logger state and variables
-        resetLogger();
+    protected void stopLoggerThread() {
+        loggerThread.stopThread();
     }
 
     /**

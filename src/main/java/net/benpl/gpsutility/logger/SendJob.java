@@ -29,7 +29,7 @@ import java.util.TimerTask;
  * To avoid conflict between threads, the task is not executed immediately, but enqueued to a FIFO queue {@link LoggerThread#egressQueue}.
  * {@link LoggerThread} is responsible for schedule these tasks execution sequentially.
  */
-final public class SendJob implements Runnable {
+public class SendJob implements Runnable {
 
     /**
      * Which Logger entity this job is to be executed.
@@ -58,6 +58,10 @@ final public class SendJob implements Runnable {
 
     public String getNmeaCmd() {
         return nmeaCmd;
+    }
+
+    public String getDesc() {
+        return desc;
     }
 
     /**
@@ -121,11 +125,19 @@ final public class SendJob implements Runnable {
                 // Start a NoResp timer for this job.
                 startNoRespTimer();
             } else {
-                // This SendJob is done. Don't care the response.
-                if (Utils.isNotEmpty(desc)) Logging.debugln("%s...success", desc);
-                // NOT need to verify response
+                // This SendJob is done. No interested for response checking.
                 logger.sendJob = null;
-                // If no more pending SendJob, notify caller the success.
+
+                // SendJob level
+                if (Utils.isNotEmpty(desc)) Logging.debugln("%s...success", desc);
+
+                // Task level
+                // Task unrelated SendJob. Nothing to do.
+                if (this instanceof NonTask) {
+                    return;
+                }
+
+                // Task related SendJob. Need to determine if task is done.
                 if (logger.isSendJobQueueEmpty() && logger.loggerTask != null) {
                     Logging.infoln("%s...success", logger.loggerTask.name);
                     Platform.runLater(() -> {
@@ -138,8 +150,12 @@ final public class SendJob implements Runnable {
             Logging.debugln("fail\n");
             // Send DATA fail is CRITICAL!!!
             // It means connection broken, logger turn off, ...
-            if (Utils.isNotEmpty(desc)) Logging.errorln("%s...failed", desc);
-            if (logger.loggerTask != null) Logging.infoln("%s...failed", logger.loggerTask.name);
+
+            // NonTask SendJob is task unrelated
+            if (!(this instanceof NonTask)) {
+                if (Utils.isNotEmpty(desc)) Logging.errorln("%s...failed", desc);
+                if (logger.loggerTask != null) Logging.errorln("%s...failed", logger.loggerTask.name);
+            }
 
             // Here mark SendJob fail only, let LoggerThread to take further process.
             success = false;
@@ -199,4 +215,14 @@ final public class SendJob implements Runnable {
         }
     }
 
+    public static class NonTask extends SendJob {
+
+        public NonTask(GpsLogger logger, String desc, String nmeaCmd, String nmeaResp) {
+            super(logger, desc, nmeaCmd, nmeaResp);
+        }
+
+        public NonTask(GpsLogger logger, String desc, String nmeaCmd, String nmeaResp, long expiry) {
+            super(logger, desc, nmeaCmd, nmeaResp, expiry);
+        }
+    }
 }

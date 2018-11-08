@@ -24,7 +24,7 @@ Not tested.
 ## Data Format
 
 GPX 1.1 compliant<br/>
-KML (To be implemented)
+KML 2.2 compliant (with Google extension)
 
 ## Screenshots
 

@@ -27,6 +27,7 @@ import net.benpl.gpsutility.misc.Utils;
 import net.benpl.gpsutility.type.NmeaHandler;
 
 import javax.xml.bind.JAXBException;
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -273,7 +274,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
                     loggerState = STATE_SERIALPORT_OPENED;
 
                     if (loggerTask instanceof LoggerTask.Disconnect) {
-                        postDisconnect();
+                        stopLoggerThread();
                     }
 
                     return true;
@@ -375,16 +376,20 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 
                                 // Export to external file one by one
                                 String filePath;
+                                Date now = new Date();
                                 for (ExportType exportType : exportTypes) {
                                     switch (exportType) {
                                         case GPX:
-                                            filePath = exportBuilder.toGpx(uploadFilePath);
+                                            filePath = exportBuilder.toGpx(new File(uploadFilePath, sdf.format(now) + ".pgx"));
                                             Logging.infoln("Log data exported to: %s", filePath);
                                             break;
 
                                         case KML:
+                                            filePath = exportBuilder.toKml(new File(uploadFilePath, sdf.format(now) + ".kml"));
+                                            Logging.infoln("Log data exported to: %s", filePath);
+                                            break;
+
                                         default:
-                                            Logging.infoln("Export to [%s] not supported yet", exportType);
                                             break;
                                     }
                                 }
@@ -608,7 +613,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
                 @Override
                 public void run() {
                     loggerThread.enqueueSendJob(
-                            new SendJob(GpsLogger.this, null, "HOLUX241,6", null) // HeartBeat with HOLUX M-241, to keep USB_MODE alive (TODO: What is for GR245???)
+                            new SendJob.NonTask(GpsLogger.this, null, "HOLUX241,6", null) // HeartBeat with HOLUX M-241, to keep USB_MODE alive (TODO: What is for GR245???)
                     );
                 }
             }, 6000, 6000);

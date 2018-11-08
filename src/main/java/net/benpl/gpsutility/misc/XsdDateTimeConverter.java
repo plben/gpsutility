@@ -24,7 +24,7 @@ import java.util.TimeZone;
  * Date and string converter in UTC/GMT format.
  */
 public class XsdDateTimeConverter {
-    private static SimpleDateFormat sdf;
+    public static SimpleDateFormat sdf;
 
     static {
         sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");

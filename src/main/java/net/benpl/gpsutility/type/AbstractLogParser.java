@@ -36,14 +36,9 @@ abstract public class AbstractLogParser {
 
     // Log parser internal variables.
     protected LinkedList<AbstractLogRecord> track = new LinkedList<>();
-    protected byte[] logData;
+    protected final byte[] logData;
 
-    /**
-     * Method to inject log data for parsing.
-     *
-     * @param logData Log data for parsing.
-     */
-    public void setLogData(byte[] logData) {
+    public AbstractLogParser(byte[] logData) {
         this.logData = logData;
     }
 

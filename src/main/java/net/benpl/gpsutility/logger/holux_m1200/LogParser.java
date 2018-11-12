@@ -60,6 +60,10 @@ public class LogParser extends AbstractLogParser {
     private int sectorBySpeed;
     private int sectorRecordSize; // can be modified on the fly by FormatRegistor from DYNAMIC_SETTING_PATTERN
 
+    public LogParser(byte[] logData) {
+        super(logData);
+    }
+
     /**
      * Parse whole log data.
      */

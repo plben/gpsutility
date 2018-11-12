@@ -27,6 +27,7 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.PropertyException;
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.util.Date;
 
@@ -49,9 +50,8 @@ public class ExportBuilder<T extends AbstractLogParser> {
     private AbstractLogRecord lastRecord;
     private double trackDistance;
 
-    public ExportBuilder(byte[] logData, Class<T> clazz) throws IllegalAccessException, InstantiationException {
-        this.logParser = clazz.newInstance();
-        this.logParser.setLogData(logData);
+    public ExportBuilder(byte[] logData, Class<T> clazz) throws IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
+        this.logParser = clazz.getConstructor(logData.getClass()).newInstance((Object) logData);
         this.logParser.parse();
     }
 
@@ -175,9 +175,9 @@ public class ExportBuilder<T extends AbstractLogParser> {
         FolderType trackFolderType = kmlFactory.createFolderType();
 
         // kml<-Document<-Name
-        documentType.setNameRevised("GPS Logger");
+        documentType.setNameRevised("GPS Device");
         // kml<-Document<-Snippet
-        documentType.setSnippetRevised("Exported " + XsdDateTimeConverter.sdf.format(new Date()));
+        documentType.setSnippetRevised("Created " + XsdDateTimeConverter.sdf.format(new Date()));
 
         // kml<-Document<-LineStyle(Normal)
         StyleType lineStyleNormal = kmlFactory.createStyleType();

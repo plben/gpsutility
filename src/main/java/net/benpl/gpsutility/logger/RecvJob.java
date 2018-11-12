@@ -141,12 +141,11 @@ final public class RecvJob implements Runnable {
                     if (logger.loggerTask != null) {
                         if (success) {
                             if (logger.isSendJobQueueEmpty()) {
-                                Logging.infoln("%s...success", logger.loggerTask.name);
+                                LoggerTask task = logger.loggerTask;
+                                logger.loggerTask = null;
+                                Logging.infoln("%s...success", task.name);
                                 // Notify caller the success.
-                                Platform.runLater(() -> {
-                                    logger.loggerTask.onSuccess();
-                                    logger.loggerTask = null;
-                                });
+                                Platform.runLater(task::onSuccess);
                             }
                         } else {
                             Logging.errorln("%s...failed", logger.loggerTask.name);

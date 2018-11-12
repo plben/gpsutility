@@ -27,6 +27,7 @@ import net.benpl.gpsutility.type.NmeaHandler;
 
 import javax.xml.bind.JAXBException;
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -416,6 +417,9 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
                             } catch (IllegalAccessException | InstantiationException e) {
                                 e.printStackTrace();
                                 Logging.infoln("Invalid log parser.");
+                            } catch (NoSuchMethodException | InvocationTargetException e) {
+                                e.printStackTrace();
+                                Logging.infoln("Initialize parser...failed");
                             }
 
                             // Do not forget to release resources

@@ -23,13 +23,14 @@ sourceCompatibility = JavaVersion.VERSION_11
 targetCompatibility = JavaVersion.VERSION_11
 mainClassName = "net.benpl.gpsutility.AppEntry"
 
-def jfxVer = "11"
 def currOS = org.gradle.internal.os.OperatingSystem.current()
 ext {
     moduleName = 'net.benpl.gpsutility'
     launcherName = 'GPSUtility'
     imageDirPath = "$buildDir/${launcherName}"
     imageZipPath = "$buildDir/${launcherName}.zip"
+
+    jfxVer = "11.0.1"
     platform = currOS.isMacOsX() ? "mac" : currOS.isWindows() ? "win" : currOS.isLinux() ? "linux" : "unix"
 }
 
@@ -64,6 +65,7 @@ jlink {
     imageDir = file(imageDirPath)
     imageZip = file(imageZipPath)
     mergedModule {
+        // API for transferring data between and within applications
         requires 'java.datatransfer'
     }
 }

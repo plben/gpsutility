@@ -6,8 +6,12 @@ A small utility for GPS data logger configuration, log data upload via serial po
 
 ## Pre-requisites
 
-Java 8(+) + JavaFX<br/>
-*(Oracle JDK8 or OpenJDK8+OpenJFX)*
+Java 11+
+
+## How to build & run?
+
+>\> gradle clean jlink<br/>
+>\> .\build\image\bin\gpsutility.bat
 
 ## GPS data loggers
 

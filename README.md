@@ -11,7 +11,7 @@ Java 11+
 ## How to build & run?
 
 >\> gradle clean jlink<br/>
->\> .\build\image\bin\gpsutility.bat
+>\> .\build\GPSUtility\bin\gpsutility.bat
 
 ## GPS data loggers
 

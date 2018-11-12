@@ -28,6 +28,8 @@ def currOS = org.gradle.internal.os.OperatingSystem.current()
 ext {
     moduleName = 'net.benpl.gpsutility'
     launcherName = 'GPSUtility'
+    imageDirPath = "$buildDir/${launcherName}"
+    imageZipPath = "$buildDir/${launcherName}.zip"
     platform = currOS.isMacOsX() ? "mac" : currOS.isWindows() ? "win" : currOS.isLinux() ? "linux" : "unix"
 }
 
@@ -59,6 +61,8 @@ compileJava {
 
 jlink {
     launcherName = project.launcherName
+    imageDir = file(imageDirPath)
+    imageZip = file(imageZipPath)
     mergedModule {
         requires 'java.datatransfer'
     }
@@ -67,6 +71,6 @@ jlink {
 tasks.jlink.doLast {
     copy {
         from('src/main/resources')
-        into("$buildDir/image/bin")
+        into("$imageDirPath/bin")
     }
 }

@@ -583,7 +583,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 
     @Override
     protected void uploadTrack(String filePath, List<ExportType> exportTypes) {
-        Logging.infoln("\nReading data from [%s]...", loggerName);
+        Logging.infoln("Reading data from [%s]...", loggerName);
 
         this.uploadFilePath = filePath;
         this.exportTypes = exportTypes;

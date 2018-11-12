@@ -189,7 +189,7 @@ public class SendJob implements Runnable {
                 logger.sendJob = null;
 
                 // Cancel all pending SendJobs
-                logger.cancelSendJobs();
+                logger.cancelAllSendJobs();
 
                 if (logger.loggerTask instanceof LoggerTask.Connect) {
                     // Reset logger if it is Connect task failure

@@ -24,8 +24,8 @@ import java.util.LinkedList;
  * Working thread of Logger entity.
  * <p>
  * It is created when SerialPort is ready, and will be destroyed when SerialPort is closed. This thread monitors on
- * {@link #ingressQueue} for RecvJob task scheduling in FIFO manner, and {@link #egressQueue}
- * for SendJob task scheduling in same manner.
+ * {@link #ingressQueue} for RecvJob task scheduling in FIFO manner, and {@link #egressQueue} for SendJob task scheduling
+ * in same manner.
  */
 public final class LoggerThread extends Thread {
 

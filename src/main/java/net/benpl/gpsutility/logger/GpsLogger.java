@@ -19,7 +19,6 @@ import javafx.application.Platform;
 import javafx.scene.layout.AnchorPane;
 import net.benpl.gpsutility.export.ExportType;
 import net.benpl.gpsutility.misc.Logging;
-import net.benpl.gpsutility.misc.Utils;
 import net.benpl.gpsutility.serialport.SPort;
 import net.benpl.gpsutility.serialport.SPortProperty;
 import net.benpl.gpsutility.type.ILoggerStateListener;
@@ -35,32 +34,58 @@ import java.util.List;
  */
 abstract public class GpsLogger implements INmeaListener {
 
+    /**
+     * File name formatter for exporting log data to external files.
+     */
     protected static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
 
+    // STATE definition of Logger entity
     protected static final int STATE_IDLE = 1001;
     protected static final int STATE_SERIALPORT_OPENING = 1002;
     protected static final int STATE_SERIALPORT_OPENED = 1003;
     protected static final int STATE_HANDSHAKED = 1004;
 
     /**
-     * Logger state can be IDLE, SERIALPORT_OPENING, SERIALPORT_READY, READY, and other logger specific states
+     * STATE of this Logger entity
      */
     protected int loggerState;
 
+    /**
+     * NAME of this Logger entity
+     */
     protected final String loggerName;
 
     // Bound serial port to talk with external GPS Logger
-    protected SPort sPort;
+    SPort sPort;
     // Serial port properties
-    protected int serialPortBaudRateIdx = 4; // 38400
-    protected int serialPortDataBitsIdx = 4; // 8 bits
-    protected int serialPortParityIdx = 0; // None
-    protected int serialPortStopBitsIdx = 0; // 1 bit
-    protected int serialPortFlowCtrlIdx = 2; // None
+    int serialPortBaudRateIdx = 4; // 38400
+    int serialPortDataBitsIdx = 4; // 8 bits
+    int serialPortParityIdx = 0; // None
+    int serialPortStopBitsIdx = 0; // 1 bit
+    int serialPortFlowCtrlIdx = 2; // None
 
+    /**
+     * Working thread of this Logger entity.
+     * Once {@link PrimaryController} issues task {@link LoggerTask.Connect} upon a sub-{@link GpsLogger} entity,
+     * {@link LoggerThread} will created immediately. And it will be along with Logger entity except {@link #STATE_IDLE}.state.
+     */
     protected LoggerThread loggerThread;
+    /**
+     * The SendJob has been executed, and waiting for expected response.
+     * It is set after {@link SendJob#nmeaCmd} sent out, and removed on receiving of expected response or NoResp timer
+     * timeout.
+     */
     protected SendJob sendJob;
+    /**
+     * The task is being executed.
+     * It is set before a task being executed, and removed after all associated SendJobs successfully sent out and expected
+     * responses received, or in case of any failure.
+     */
     protected LoggerTask loggerTask;
+    /**
+     * The listener on Logger entity state change. (Currently only other states -> {@link #STATE_IDLE})
+     * This listener was set by task {@link LoggerTask.Connect}, and removed when Logger entity go {@link #STATE_IDLE}.
+     */
     protected ILoggerStateListener loggerStateListener;
 
     /**
@@ -99,14 +124,17 @@ abstract public class GpsLogger implements INmeaListener {
      * Reset logger state and all variables.
      */
     final protected void resetLogger() {
+        // The chance for subclass to cleanup resources.
         this.preResetLogger();
 
+        // Notify PrimaryController this Logger entity is gone.
         if (this.loggerStateListener != null) {
             ILoggerStateListener listener = this.loggerStateListener;
             Platform.runLater(listener::loggerIdle);
             this.loggerStateListener = null;
         }
 
+        // Close associated serial port
         if (sPort != null) {
             sPort.closePort();
             sPort = null;
@@ -183,31 +211,49 @@ abstract public class GpsLogger implements INmeaListener {
         loggerThread.stopThread();
     }
 
-    protected void stopLoggerThread() {
+    /**
+     * Method to stop this Logger entity.
+     * <p>
+     * This is achieved by stopping the LoggerThread. After received this STOP notification, LoggerThread will cleanup
+     * all resources, reset Logger entity (variables and state), and exit. Finally, a callback {@link ILoggerStateListener#loggerIdle()}
+     * will be invoked to notify {@link PrimaryController} the Logger entity is gone.
+     */
+    protected void stopLogger() {
         loggerThread.stopThread();
     }
 
     /**
-     * Upload logger data operation performed by user.
+     * Method to upload logger data from external logger.
+     * Invoked by task {@link LoggerTask.UploadTrack}.
      *
      * @param filePath    Folder the logger data will be uploaded to.
      * @param exportTypes The export file formats.
      */
     abstract protected void uploadTrack(String filePath, List<ExportType> exportTypes);
 
+    /**
+     * Execute the task issued by UI.
+     *
+     * @param loggerTask The task to be executed.
+     */
     @SuppressWarnings("unchecked")
     final public void execLoggerTask(LoggerTask loggerTask) {
+        // Reject if a task is still being executed.
         if (this.loggerTask != null) {
             Logging.errorln("LoggerTask [%s] is being executed.", this.loggerTask.name);
             return;
         }
 
+        // Reject if task precondition checking failed.
         if (!loggerTask.preRun(this)) return;
 
+        // Start this task if pass above two steps.
         Logging.infoln("\n%s...start", loggerTask.name);
-
+        // Save task reference
         this.loggerTask = loggerTask;
+        // Task pre-start callback (the chance for UI to enable/disable components before task actually started)
         this.loggerTask.onStart();
+        // Start task
         this.loggerTask.run(this);
     }
 
@@ -236,7 +282,7 @@ abstract public class GpsLogger implements INmeaListener {
     /**
      * Cancel all pending SendJobs in {@link LoggerThread#egressQueue}.
      */
-    protected void cancelSendJobs() {
+    protected void cancelAllSendJobs() {
         if (loggerThread != null) {
             loggerThread.cancelSendJobs();
         }
@@ -248,7 +294,7 @@ abstract public class GpsLogger implements INmeaListener {
      * @return The SerialPort BaudRate index of
      * {@link net.benpl.gpsutility.serialport.SPortProperty#serialPortBaudRateList}.
      */
-    final public int getSerialPortBaudRateIdx() {
+    final int getSerialPortBaudRateIdx() {
         return serialPortBaudRateIdx;
     }
 
@@ -258,7 +304,7 @@ abstract public class GpsLogger implements INmeaListener {
      * @return The SerialPort DataBits index of
      * {@link net.benpl.gpsutility.serialport.SPortProperty#serialPortDataBitsList}.
      */
-    final public int getSerialPortDataBitsIdx() {
+    final int getSerialPortDataBitsIdx() {
         return serialPortDataBitsIdx;
     }
 
@@ -268,7 +314,7 @@ abstract public class GpsLogger implements INmeaListener {
      * @return The SerialPort Parity index of
      * {@link net.benpl.gpsutility.serialport.SPortProperty#serialPortParityList}.
      */
-    final public int getSerialPortParityIdx() {
+    final int getSerialPortParityIdx() {
         return serialPortParityIdx;
     }
 
@@ -278,7 +324,7 @@ abstract public class GpsLogger implements INmeaListener {
      * @return The SerialPort StopBits index of
      * {@link net.benpl.gpsutility.serialport.SPortProperty#serialPortStopBitsList}.
      */
-    final public int getSerialPortStopBitsIdx() {
+    final int getSerialPortStopBitsIdx() {
         return serialPortStopBitsIdx;
     }
 
@@ -288,7 +334,7 @@ abstract public class GpsLogger implements INmeaListener {
      * @return The SerialPort FlowCtrl index of
      * {@link net.benpl.gpsutility.serialport.SPortProperty#serialPortFlowCtrlList}.
      */
-    final public int getSerialPortFlowCtrlIdx() {
+    final int getSerialPortFlowCtrlIdx() {
         return serialPortFlowCtrlIdx;
     }
 

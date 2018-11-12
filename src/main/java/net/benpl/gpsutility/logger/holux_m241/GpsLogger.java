@@ -119,7 +119,8 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
         LinkedHashMap<String, AnchorPane> panels = new LinkedHashMap<>();
         try {
             // Create logger associated Config/Control Pane
-            FXMLLoader loader = new FXMLLoader(getClass().getClassLoader().getResource("fxml/HoluxM241.fxml"));
+            File file = new File("fxml/HoluxM241.fxml");
+            FXMLLoader loader = new FXMLLoader(file.toURI().toURL());
             configPane = loader.load();
             configPaneController = loader.getController();
             configPaneController.setGpsLogger(GpsLogger.this);
@@ -274,7 +275,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
                     loggerState = STATE_SERIALPORT_OPENED;
 
                     if (loggerTask instanceof LoggerTask.Disconnect) {
-                        stopLoggerThread();
+                        stopLogger();
                     }
 
                     return true;
@@ -541,7 +542,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 
     @Override
     protected void uploadTrack(String filePath, List<ExportType> exportTypes) {
-        Logging.infoln("\nReading data from [%s]...", loggerName);
+        Logging.infoln("Reading data from [%s]...", loggerName);
 
         this.uploadFilePath = filePath;
         this.exportTypes = exportTypes;

@@ -35,6 +35,7 @@ class Version {
     private static final String v1_0 = "V1.0";
 
     /**
+     * =================================================================
      * - USB_MODE for Holux GR-245
      * - KML 2.2 compliant (with Google extension)
      * - Minor bug fix, and optimization
@@ -42,7 +43,13 @@ class Version {
     private static final String v1_1 = "V1.1";
 
     /**
+     * =================================================================
+     * - Upgrade to JDK 11 for better self-contained packaging
+     */
+    private static final String v1_2 = "V1.2";
+
+    /**
      * Application current version
      */
-    static final String current = v1_1;
+    static final String current = v1_2;
 }

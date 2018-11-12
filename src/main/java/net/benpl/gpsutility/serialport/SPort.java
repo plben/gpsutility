@@ -41,7 +41,7 @@ public final class SPort implements SerialPortDataListener {
 
     private INmeaListener nmeaListener = null;
 
-    private final byte[] byteBuff = new byte[4096];
+    private final byte[] byteBuff = new byte[6144];
     private String strBuff = "";
 
     public SPort(String name, SerialPort serialPort) {
@@ -63,9 +63,10 @@ public final class SPort implements SerialPortDataListener {
     }
 
     /**
-     * Must be overridden to return one or more desired event constants for which the {@link #serialEvent(SerialPortEvent)}
-     * callback should be triggered. Valid event constants are:
-     * <p>
+     * Override to return desired event {@link SerialPort#LISTENING_EVENT_DATA_AVAILABLE} for which the {@link #serialEvent(SerialPortEvent)}
+     * callback should be triggered.
+     *
+     * Valid event constants are:
      * {@link SerialPort#LISTENING_EVENT_DATA_AVAILABLE}
      * {@link SerialPort#LISTENING_EVENT_DATA_RECEIVED}
      * {@link SerialPort#LISTENING_EVENT_DATA_WRITTEN}
@@ -90,37 +91,29 @@ public final class SPort implements SerialPortDataListener {
 
             switch (eventType) {
                 case SerialPort.LISTENING_EVENT_DATA_AVAILABLE:
+                    int i;
                     // Read data out from serial port
                     int recvLen = serialPort.readBytes(byteBuff, byteBuff.length);
-
-                    // Discard the data if no listener is attached.
-                    if (nmeaListener == null) {
-                        break;
-                    }
-
+                    // Discard the data if no listener attached.
+                    if (nmeaListener == null) break;
                     // Convert byte array to string, and append to string buffer.
                     String strRecv = strBuff + new String(byteBuff, 0, recvLen, StandardCharsets.US_ASCII);
                     // Split the whole string into segments with END_OF_PACKAGE
                     String[] segs = strRecv.split(END_OF_PACKAGE);
-
                     // Segmentation failure means no END_OF_PACKAGE found.
                     // Put new string into buffer, and continue listening...
                     if (segs.length == 0) {
                         strBuff = strRecv;
                         break;
                     }
-
-                    int i;
-
                     // Send string segment to listener one by one.
                     for (i = 0; i < (segs.length - 1); i++) {
                         nmeaListener.recvNmea(segs[i]);
                     }
-
-                    // Send the last string segment to listener.
+                    // Verify the last string segment if it is ended with '\r\n'
                     i = segs.length - 1;
                     if (strRecv.endsWith(END_OF_PACKAGE)) {
-                        // If the last segment is also completed, send it out.
+                        // If the last segment is also ended with '\r\n', send it out.
                         nmeaListener.recvNmea(segs[i]);
                         // And free the string buffer.
                         strBuff = "";
@@ -170,7 +163,7 @@ public final class SPort implements SerialPortDataListener {
      * @return TRUE - data sent successfully, FALSE - otherwise.
      */
     public boolean sendData(String data) {
-        byte[] buff = (data + "\r\n").getBytes(StandardCharsets.US_ASCII);
+        byte[] buff = (data + END_OF_PACKAGE).getBytes(StandardCharsets.US_ASCII);
         int sent = serialPort.writeBytes(buff, buff.length);
         return (sent == buff.length);
     }
@@ -220,12 +213,4 @@ public final class SPort implements SerialPortDataListener {
         }
     }
 
-    /**
-     * Returns whether the serial port is currently opened and available for communication.
-     *
-     * @return Whether the port is opened.
-     */
-    public boolean isConnected() {
-        return serialPort.isOpen();
-    }
 }

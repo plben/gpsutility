@@ -120,8 +120,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
         LinkedHashMap<String, AnchorPane> panels = new LinkedHashMap<>();
         try {
             // Create logger associated Config/Control Pane
-            File file = new File("fxml/HoluxM241.fxml");
-            FXMLLoader loader = new FXMLLoader(file.toURI().toURL());
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/HoluxM241.fxml"));
             configPane = loader.load();
             configPaneController = loader.getController();
             configPaneController.setGpsLogger(GpsLogger.this);

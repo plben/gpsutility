@@ -23,8 +23,6 @@ import javafx.scene.image.Image;
 import javafx.stage.Stage;
 import net.benpl.gpsutility.logger.PrimaryController;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Locale;
 
@@ -43,8 +41,7 @@ public class AppEntry extends Application {
     @Override
     public void start(Stage primaryStage) throws IOException {
         // Load .fxml and reflect it into AnchorPane object.
-        File fxmlFile = new File("fxml/PrimaryWindow.fxml");
-        FXMLLoader loader = new FXMLLoader(fxmlFile.toURI().toURL());
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/PrimaryWindow.fxml"));
         Parent root = loader.load();
 
         // Get attached controller from AnchorPane object.
@@ -60,8 +57,7 @@ public class AppEntry extends Application {
 
         // Display this AnchorPane window.
         primaryStage.setTitle("GPS Utility - " + Version.current);
-        File logoFile = new File("images/ic_logo.png");
-        primaryStage.getIcons().add(new Image(new FileInputStream(logoFile)));
+        primaryStage.getIcons().add(new Image(getClass().getResourceAsStream("/images/ic_logo.png")));
         primaryStage.setScene(new Scene(root));
         primaryStage.setResizable(false);
         primaryStage.show();

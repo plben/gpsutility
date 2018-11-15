@@ -24,13 +24,19 @@ module net.benpl.gpsutility {
     requires com.sun.xml.bind;
     // Annotation @PostConstruct
     requires java.annotation;
+    // JetBrains annotations
+    requires org.jetbrains.annotations;
     // JavaFX
     requires javafx.base;
     requires javafx.controls;
     requires javafx.fxml;
     requires javafx.graphics;
 
-    exports net.benpl.gpsutility;
+    // By default, a type in a module is not accessible to other modules unless it’s a public type and you export its package.
+    // Apply to public type.
+    exports net.benpl.gpsutility to javafx.fxml, javafx.graphics;
+    exports net.benpl.gpsutility.logger to javafx.base;
+    // Apply to reflection.
     opens net.benpl.gpsutility.logger to javafx.fxml;
     opens net.benpl.gpsutility.logger.holux_m241 to javafx.fxml;
     opens net.benpl.gpsutility.gpx to java.xml.bind;

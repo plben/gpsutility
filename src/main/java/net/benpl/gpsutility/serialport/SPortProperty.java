@@ -31,7 +31,10 @@ public class SPortProperty {
             new SPortProperty("19200", 19200),
             new SPortProperty("38400", 38400),
             new SPortProperty("57600", 57600),
-            new SPortProperty("115200", 115200)
+            new SPortProperty("115200", 115200),
+            new SPortProperty("230400", 230400),
+            new SPortProperty("460800", 460800),
+            new SPortProperty("921600", 921600)
     );
 
     public static final ObservableList<SPortProperty> serialPortDataBitsList = FXCollections.observableArrayList(

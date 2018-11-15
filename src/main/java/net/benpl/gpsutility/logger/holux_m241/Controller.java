@@ -66,7 +66,7 @@ public class Controller implements IController {
 
     @FXML
     private void saveConfigBtnActionPerformed(ActionEvent event) {
-        gpsLogger.execLoggerTask(new LoggerTask.SaveConfig(getRcdMethod(), getRecordBy(), getRecordBySec(), getRecordByDist()) {
+        gpsLogger.execLoggerTask(new LoggerTask.SaveConfig(gpsLogger, getRcdMethod(), getRecordBy(), getRecordBySec(), getRecordByDist()) {
             @Override
             public void onStart() {
                 inExecuting();
@@ -83,7 +83,7 @@ public class Controller implements IController {
              * So no action is necessary here.
              */
             @Override
-            public void onFail() {
+            public void onFail(CAUSE cause) {
                 Logging.errorln("Save logger config ... fail");
                 outExecuting();
             }
@@ -98,7 +98,7 @@ public class Controller implements IController {
         String userName = ownerNameInput.getText();
         if (Utils.isEmpty(userName)) return;
 
-        gpsLogger.execLoggerTask(new LoggerTask.ModUserName(userName) {
+        gpsLogger.execLoggerTask(new LoggerTask.ModUserName(gpsLogger, userName) {
             @Override
             public void onStart() {
                 inExecuting();
@@ -115,7 +115,7 @@ public class Controller implements IController {
              * So no action is necessary here.
              */
             @Override
-            public void onFail() {
+            public void onFail(CAUSE cause) {
                 Logging.errorln("Modify logger UserName ... fail");
                 outExecuting();
             }

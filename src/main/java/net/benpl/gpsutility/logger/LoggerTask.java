@@ -15,27 +15,33 @@
 
 package net.benpl.gpsutility.logger;
 
-import net.benpl.gpsutility.export.ExportType;
+import javafx.application.Platform;
 import net.benpl.gpsutility.misc.Logging;
 import net.benpl.gpsutility.serialport.SPort;
 import net.benpl.gpsutility.serialport.SPortProperty;
 import net.benpl.gpsutility.type.ILoggerStateListener;
 
-import java.util.List;
-
 /**
  * Task issued by controller and executed by Logger entity.
  */
-abstract public class LoggerTask<T extends GpsLogger> {
+abstract public class LoggerTask {
+
+    public enum CAUSE {
+        SUCCESS, HANDLE_NMEA_FAIL, NO_RESP, SEND_DATA_FAIL
+    }
+
     protected final String name;
+    protected final GpsLogger gpsLogger;
 
     /**
      * Constructor of task.
      *
-     * @param name The name of this task.
+     * @param name      The name of this task.
+     * @param gpsLogger The logger entity to execute this task.
      */
-    public LoggerTask(String name) {
+    public LoggerTask(String name, GpsLogger gpsLogger) {
         this.name = name;
+        this.gpsLogger = gpsLogger;
     }
 
     /**
@@ -51,10 +57,9 @@ abstract public class LoggerTask<T extends GpsLogger> {
      * Callback prior to task execution, to double check if task can go ahead.
      * You can override this method for your task.
      *
-     * @param gpsLogger The logger to execute this task.
      * @return TRUE - task accepted, FALSE - task rejected.
      */
-    public boolean preRun(T gpsLogger) {
+    public boolean preRun() {
         return true;
     }
 
@@ -65,10 +70,20 @@ abstract public class LoggerTask<T extends GpsLogger> {
 
     /**
      * The task execution body.
-     *
-     * @param gpsLogger The logger to execute this task.
      */
-    abstract public void run(T gpsLogger);
+    final void run0() {
+        Logging.infoln("\n%s...start", name);
+
+        // Task pre-start callback (the chance for UI to enable/disable components before task actually started)
+        this.onStart();
+
+        this.run();
+    }
+
+    /**
+     * The task execution body.
+     */
+    abstract protected void run();
 
     /**
      * Callback on task execution success.
@@ -77,13 +92,52 @@ abstract public class LoggerTask<T extends GpsLogger> {
 
     /**
      * Callback on task execution failure.
+     *
+     * @param cause The failure cause.
      */
-    abstract public void onFail();
+    abstract public void onFail(CAUSE cause);
+
+    /**
+     * Callback on task finished or error occurred.
+     *
+     * @param cause The cause when this event occurred.
+     */
+    final void postRun0(CAUSE cause) {
+        if (cause == CAUSE.SUCCESS) {
+            Logging.infoln("%s...success", name);
+        } else {
+            Logging.errorln("%s...failed", name);
+        }
+
+        Platform.runLater(() -> {
+            // Notify issuer the success or failure.
+            if (cause == CAUSE.SUCCESS) onSuccess();
+            else onFail(cause);
+
+            // Stop logger entity on fatal error.
+            // Or let each task to take further action.
+            if (cause == CAUSE.SEND_DATA_FAIL) {
+                gpsLogger.stopLogger();
+            } else {
+                postRun(cause);
+            }
+        });
+    }
+
+    /**
+     * Callback post task execution or error occurred, to release related resources.
+     * You can override this method for your task.
+     */
+    protected void postRun(CAUSE cause) {
+        if (cause != CAUSE.SUCCESS) {
+            gpsLogger.stopLogger();
+        }
+    }
 
     /**
      * ConnectLogger Task
      */
-    abstract public static class Connect extends LoggerTask<GpsLogger> {
+    abstract public static class Connect extends LoggerTask {
         private final SPort sPort;
         private final int serialPortBaudRateIdx;
         private final int serialPortDataBitsIdx;
@@ -95,6 +149,7 @@ abstract public class LoggerTask<T extends GpsLogger> {
         /**
          * Perform start GPS logger operation.
          *
+         * @param gpsLogger             The logger entity to execute this task.
          * @param sPort                 Serial port to talk with this logger.
          * @param serialPortBaudRateIdx The index of
          *                              {@link SPortProperty#serialPortBaudRateList}
@@ -108,8 +163,8 @@ abstract public class LoggerTask<T extends GpsLogger> {
          *                              {@link SPortProperty#serialPortFlowCtrlList}
          * @param loggerStateListener   Listen to the state changed of Logger entity..
          */
-        public Connect(SPort sPort, int serialPortBaudRateIdx, int serialPortDataBitsIdx, int serialPortParityIdx, int serialPortStopBitsIdx, int serialPortFlowCtrlIdx, ILoggerStateListener loggerStateListener) {
-            super("Connect Logger");
+        public Connect(GpsLogger gpsLogger, SPort sPort, int serialPortBaudRateIdx, int serialPortDataBitsIdx, int serialPortParityIdx, int serialPortStopBitsIdx, int serialPortFlowCtrlIdx, ILoggerStateListener loggerStateListener) {
+            super("Connect Logger", gpsLogger);
             this.sPort = sPort;
             this.serialPortBaudRateIdx = serialPortBaudRateIdx;
             this.serialPortDataBitsIdx = serialPortDataBitsIdx;
@@ -120,12 +175,12 @@ abstract public class LoggerTask<T extends GpsLogger> {
         }
 
         @Override
-        public boolean preRun(GpsLogger gpsLogger) {
+        public boolean preRun() {
             return gpsLogger.preConnect();
         }
 
         @Override
-        public void run(GpsLogger gpsLogger) {
+        protected void run() {
             gpsLogger.sPort = sPort;
             // Save SerialPort properties
             gpsLogger.serialPortBaudRateIdx = serialPortBaudRateIdx;
@@ -188,41 +243,49 @@ abstract public class LoggerTask<T extends GpsLogger> {
     /**
      * DisconnectLogger Task
      */
-    abstract public static class Disconnect extends LoggerTask<GpsLogger> {
+    abstract public static class Disconnect extends LoggerTask {
         /**
          * Manually stop GPS Logger.
+         *
+         * @param gpsLogger The logger entity to execute this task.
          */
-        public Disconnect() {
-            super("Disconnect Logger");
+        public Disconnect(GpsLogger gpsLogger) {
+            super("Disconnect Logger", gpsLogger);
         }
 
         @Override
-        public void run(GpsLogger gpsLogger) {
+        protected void run() {
             if (gpsLogger.preDisconnect()) {
                 gpsLogger.postDisconnect();
             }
+        }
+
+        @Override
+        protected void postRun(CAUSE cause) {
+            gpsLogger.stopLogger();
         }
     }
 
     /**
      * DebugNmea Task
      */
-    abstract public static class DebugNmea extends LoggerTask<GpsLogger> {
+    abstract public static class DebugNmea extends LoggerTask {
         private final String nmea;
 
         /**
          * Debug NMEA command received from user input.
          * Wrap into SendJob and enqueue it to the job queue.
          *
-         * @param nmea The NMEA command.
+         * @param gpsLogger The logger entity to execute this task.
+         * @param nmea      The NMEA command.
          */
-        public DebugNmea(String nmea) {
-            super("Debug NMEA");
+        public DebugNmea(GpsLogger gpsLogger, String nmea) {
+            super("Debug NMEA", gpsLogger);
             this.nmea = nmea;
         }
 
         @Override
-        public void run(GpsLogger gpsLogger) {
+        protected void run() {
             gpsLogger.loggerThread.enqueueSendJob(new SendJob(gpsLogger, null, nmea, null));
         }
     }
@@ -230,25 +293,19 @@ abstract public class LoggerTask<T extends GpsLogger> {
     /**
      * UploadTrack Task
      */
-    abstract public static class UploadTrack extends LoggerTask<GpsLogger> {
-        private final String filePath;
-        private final List<ExportType> exportTypes;
-
+    abstract public static class UploadTrack extends LoggerTask {
         /**
-         * Upload logger data operation performed by user.
+         * Upload log data operation performed by user.
          *
-         * @param filePath    Folder the logger data will be uploaded to.
-         * @param exportTypes The export file formats.
+         * @param gpsLogger The logger entity to execute this task.
          */
-        public UploadTrack(String filePath, List<ExportType> exportTypes) {
-            super("Upload Track");
-            this.filePath = filePath;
-            this.exportTypes = exportTypes;
+        public UploadTrack(GpsLogger gpsLogger) {
+            super("Upload Track", gpsLogger);
         }
 
         @Override
-        public void run(GpsLogger gpsLogger) {
-            gpsLogger.uploadTrack(filePath, exportTypes);
+        protected void run() {
+            gpsLogger.uploadTrack();
         }
 
         /**
@@ -257,6 +314,19 @@ abstract public class LoggerTask<T extends GpsLogger> {
          * @param progress The upload progress.
          */
         abstract public void onProgress(double progress);
+
+        /**
+         * Callback post task execution, to release related resources.
+         * You can override this method for your task.
+         */
+        @Override
+        protected void postRun(CAUSE cause) {
+            if (cause == CAUSE.SUCCESS) {
+                gpsLogger.postUploadTrack();
+            } else {
+                gpsLogger.stopLogger();
+            }
+        }
     }
 
 }

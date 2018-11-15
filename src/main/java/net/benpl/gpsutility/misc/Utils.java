@@ -28,10 +28,10 @@ public class Utils {
     /**
      * Calculate spherical distance between two coordinates.
      *
-     * @param lat1 Latitude of coordinate 1.
-     * @param lon1 Longitude of coordinate 1.
-     * @param lat2 Latitude of coordinate 2.
-     * @param lon2 Longitude of coordinate 2.
+     * @param lat1 Latitude of origin coordinate.
+     * @param lon1 Longitude of origin coordinate.
+     * @param lat2 Latitude of destination coordinate.
+     * @param lon2 Longitude of destination coordinate.
      * @return Distance between these 2 coordinates.
      */
     public static double sphericalDistance(double lat1, double lon1, double lat2, double lon2) {
@@ -158,13 +158,10 @@ public class Utils {
             swap[swap.length - 1 - i] = buff[offset + i];
         }
 
-        Integer value
-                = ((swap[0] << 24) & 0xFF000000)
+        return ((swap[0] << 24) & 0xFF000000)
                 | ((swap[1] << 16) & 0x00FF0000)
                 | ((swap[2] << 8) & 0x0000FF00)
                 | (swap[3] & 0x000000FF);
-
-        return value;
     }
 
     /**

@@ -17,11 +17,10 @@ package net.benpl.gpsutility.logger.debugger;
 
 import javafx.application.Platform;
 import javafx.scene.layout.AnchorPane;
-import net.benpl.gpsutility.export.ExportType;
 import net.benpl.gpsutility.misc.Logging;
+import net.benpl.gpsutility.type.AbstractLogParser;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 
 /**
  * Debugger entity inherited from {@link net.benpl.gpsutility.logger.GpsLogger}.
@@ -51,7 +50,12 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
     }
 
     @Override
-    protected void uploadTrack(String filePath, List<ExportType> exportTypes) {
+    protected void uploadTrack() {
+        // nothing to do
+    }
+
+    @Override
+    protected void postUploadTrack() {
         // nothing to do
     }
 
@@ -79,6 +83,11 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
     protected boolean dispatchNmea(String[] segs) {
         // Yes, got it and handled
         return true;
+    }
+
+    @Override
+    protected AbstractLogParser getParser() {
+        return null;
     }
 
 }

@@ -65,7 +65,7 @@ public final class SPort implements SerialPortDataListener {
     /**
      * Override to return desired event {@link SerialPort#LISTENING_EVENT_DATA_AVAILABLE} for which the {@link #serialEvent(SerialPortEvent)}
      * callback should be triggered.
-     *
+     * <p>
      * Valid event constants are:
      * {@link SerialPort#LISTENING_EVENT_DATA_AVAILABLE}
      * {@link SerialPort#LISTENING_EVENT_DATA_RECEIVED}

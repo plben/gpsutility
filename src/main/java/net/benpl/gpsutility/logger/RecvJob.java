@@ -15,7 +15,6 @@
 
 package net.benpl.gpsutility.logger;
 
-import javafx.application.Platform;
 import net.benpl.gpsutility.misc.Logging;
 import net.benpl.gpsutility.misc.Utils;
 
@@ -131,27 +130,22 @@ final public class RecvJob implements Runnable {
 
                     // Task level
                     // Task unrelated SendJob. Nothing to do.
-                    if (logger.sendJob instanceof SendJob.NonTask) {
+                    if (logger.sendJob instanceof SendJob.NonTask || logger.loggerTask == null) {
                         logger.sendJob = null;
                         return;
                     }
 
-                    // Task related SendJob. Need to determine if task is done.
-                    logger.sendJob = null;
-                    if (logger.loggerTask != null) {
-                        if (success) {
-                            if (logger.isSendJobQueueEmpty()) {
-                                LoggerTask task = logger.loggerTask;
-                                logger.loggerTask = null;
-                                Logging.infoln("%s...success", task.name);
-                                // Notify caller the success.
-                                Platform.runLater(task::onSuccess);
-                            }
-                        } else {
-                            Logging.errorln("%s...failed", logger.loggerTask.name);
-                            // LoggerThread will take care this failure case
-                        }
+                    // Stop the task if it is done or error occurred.
+                    if (!success) {
+                        logger.loggerTask.postRun0(LoggerTask.CAUSE.HANDLE_NMEA_FAIL);
+                        logger.loggerTask = null;
+                    } else if (logger.sendJob.isLastJob()) {
+                        logger.loggerTask.postRun0(LoggerTask.CAUSE.SUCCESS);
+                        logger.loggerTask = null;
                     }
+
+                    // Release sendJob reference since expected response received.
+                    logger.sendJob = null;
                 } else {
                     // Don't care other not intended incoming NMEAs
                     success = true;

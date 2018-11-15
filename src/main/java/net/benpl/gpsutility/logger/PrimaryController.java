@@ -29,22 +29,29 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.DirectoryChooser;
 import net.benpl.gpsutility.Loggers;
-import net.benpl.gpsutility.export.ExportType;
 import net.benpl.gpsutility.misc.Logging;
 import net.benpl.gpsutility.misc.Settings;
 import net.benpl.gpsutility.misc.Utils;
 import net.benpl.gpsutility.serialport.SPort;
 import net.benpl.gpsutility.serialport.SPortProperty;
+import net.benpl.gpsutility.type.AbstractLogParser;
 import net.benpl.gpsutility.type.IController;
 import net.benpl.gpsutility.type.ILoggerStateListener;
 
+import javax.xml.bind.JAXBException;
 import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
  * Controller of {@link fxml/PrimaryWindow.fxml}
  */
 public class PrimaryController implements IController, ILoggerStateListener {
+
+    /**
+     * File name formatter for exporting log data to external files.
+     */
+    protected static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
 
     /**
      * Maintain an available serial port list for referred by {@link #loggerChooser}.
@@ -138,7 +145,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
         String text = nmeaInput.getText();
         if (Utils.isEmpty(text)) return;
 
-        activeLogger.execLoggerTask(new LoggerTask.DebugNmea(text) {
+        activeLogger.execLoggerTask(new LoggerTask.DebugNmea(activeLogger, text) {
             @Override
             public void onStart() {
                 inExecuting();
@@ -154,7 +161,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
              * So no action is necessary here.
              */
             @Override
-            public void onFail() {
+            public void onFail(CAUSE cause) {
                 outExecuting();
             }
         });
@@ -216,11 +223,11 @@ public class PrimaryController implements IController, ILoggerStateListener {
     private void uploadTrackBtnActionPerformed(ActionEvent event) {
         uploadProgress.setProgress(0);
 
-        List<ExportType> exportTypes = new ArrayList<>();
-        if (gpxExport.isSelected()) exportTypes.add(ExportType.GPX);
-        if (kmlExport.isSelected()) exportTypes.add(ExportType.KML);
+        List<AbstractLogParser.ExportType> exportTypes = new ArrayList<>();
+        if (gpxExport.isSelected()) exportTypes.add(AbstractLogParser.ExportType.GPX);
+        if (kmlExport.isSelected()) exportTypes.add(AbstractLogParser.ExportType.KML);
 
-        activeLogger.execLoggerTask(new LoggerTask.UploadTrack(uploadPath.getText(), exportTypes) {
+        activeLogger.execLoggerTask(new LoggerTask.UploadTrack(activeLogger) {
             @Override
             public void onProgress(double progress) {
                 // Update progress
@@ -234,6 +241,42 @@ public class PrimaryController implements IController, ILoggerStateListener {
 
             @Override
             public void onSuccess() {
+                try {
+                    // Parse the log
+                    AbstractLogParser logParser = activeLogger.getParser();
+                    Logging.infoln("\nParsing log data...");
+                    logParser.parse();
+                    Logging.infoln("Parse log data...success");
+
+                    // Export to external file one by one
+                    Date now = new Date();
+                    String exportPath = uploadPath.getText();
+                    String filename = sdf.format(now);
+                    String exported;
+                    for (AbstractLogParser.ExportType exportType : exportTypes) {
+                        switch (exportType) {
+                            case GPX:
+                                exported = logParser.toGpx(new File(exportPath, filename + ".pgx"), now);
+                                Logging.infoln("Log data exported to: %s", exported);
+                                break;
+
+                            case KML:
+                                exported = logParser.toKml(new File(exportPath, filename + ".kml"), now);
+                                Logging.infoln("Log data exported to: %s", exported);
+                                break;
+
+                            default:
+                                break;
+                        }
+                    }
+                } catch (JAXBException e) {
+                    e.printStackTrace();
+                    Logging.infoln("Parse log data...failed");
+                }
+
+                // Do not forget to release resources
+                activeLogger.postUploadTrack();
+
                 outExecuting();
             }
 
@@ -242,7 +285,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
              * So no action is necessary here.
              */
             @Override
-            public void onFail() {
+            public void onFail(CAUSE cause) {
                 Logging.errorln("Upload track data ... fail");
                 outExecuting();
             }
@@ -264,6 +307,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
             GpsLogger logger = loggerChooser.getValue();
 
             logger.execLoggerTask(new LoggerTask.Connect(
+                    logger,
                     sPortChooser.getValue(),
                     baudRateChooser.getSelectionModel().getSelectedIndex(),
                     dataBitsChooser.getSelectionModel().getSelectedIndex(),
@@ -312,7 +356,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
                 }
 
                 @Override
-                public void onFail() {
+                public void onFail(CAUSE cause) {
                     // START task executed ... failed
                     resetAll();
                     logWindow.setText("Logger - Disconnected.");
@@ -320,7 +364,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
             });
         } else {
             logWindow.setText("Logger - Disconnecting...");
-            activeLogger.execLoggerTask(new LoggerTask.Disconnect() {
+            activeLogger.execLoggerTask(new LoggerTask.Disconnect(activeLogger) {
                 @Override
                 public void onStart() {
                     // Nothing to do
@@ -336,7 +380,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
                  * So no action is necessary here.
                  */
                 @Override
-                public void onFail() {
+                public void onFail(CAUSE cause) {
                     Logging.errorln("Disconnect logger [%s] ... fail", activeLogger.loggerName);
                     resetAll();
                 }
@@ -470,7 +514,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
         } else {
             // Stop the active logger
             // then exit this application.
-            activeLogger.execLoggerTask(new LoggerTask.Disconnect() {
+            activeLogger.execLoggerTask(new LoggerTask.Disconnect(activeLogger) {
                 @Override
                 public void onStart() {
                     // Nothing to do
@@ -483,7 +527,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
                 }
 
                 @Override
-                public void onFail() {
+                public void onFail(CAUSE cause) {
                     // Exit application, exception case
                     System.exit(0);
                 }

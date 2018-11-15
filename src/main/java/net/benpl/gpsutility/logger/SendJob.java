@@ -15,7 +15,6 @@
 
 package net.benpl.gpsutility.logger;
 
-import javafx.application.Platform;
 import net.benpl.gpsutility.misc.Logging;
 import net.benpl.gpsutility.misc.Utils;
 
@@ -47,6 +46,7 @@ public class SendJob implements Runnable {
      * NMEA response to be expected. (Data field only)
      */
     private final String nmeaResp;
+    private final boolean lastJob;
     /**
      * Expiry value of NoResp timer.
      */
@@ -54,14 +54,8 @@ public class SendJob implements Runnable {
 
     private Timer noRespTimer = null;
 
-    boolean success = true;
-
-    public String getNmeaCmd() {
-        return nmeaCmd;
-    }
-
-    public String getDesc() {
-        return desc;
+    public boolean isLastJob() {
+        return lastJob;
     }
 
     /**
@@ -77,6 +71,24 @@ public class SendJob implements Runnable {
         this.desc = desc;
         this.nmeaCmd = nmeaCmd;
         this.nmeaResp = nmeaResp;
+        this.lastJob = false;
+    }
+
+    /**
+     * The job to encapsulate NMEA command and send it out on SerialPort.
+     *
+     * @param logger   Logger to handle this job.
+     * @param desc     Brief description of this job.
+     * @param nmeaCmd  The NMEA command to send out.
+     * @param nmeaResp The expected NMEA response.
+     * @param lastJob  Is this the last job.
+     */
+    public SendJob(GpsLogger logger, String desc, String nmeaCmd, String nmeaResp, boolean lastJob) {
+        this.logger = logger;
+        this.desc = desc;
+        this.nmeaCmd = nmeaCmd;
+        this.nmeaResp = nmeaResp;
+        this.lastJob = lastJob;
     }
 
     /**
@@ -88,13 +100,15 @@ public class SendJob implements Runnable {
      * @param desc     Brief description of this job.
      * @param nmeaCmd  The NMEA command to send out.
      * @param nmeaResp The expected NMEA response.
+     * @param lastJob  Is this the last job.
      * @param expiry   Expiry value of NoResp timer.
      */
-    public SendJob(GpsLogger logger, String desc, String nmeaCmd, String nmeaResp, long expiry) {
+    public SendJob(GpsLogger logger, String desc, String nmeaCmd, String nmeaResp, boolean lastJob, long expiry) {
         this.logger = logger;
         this.desc = desc;
         this.nmeaCmd = nmeaCmd;
         this.nmeaResp = nmeaResp;
+        this.lastJob = lastJob;
         this.expiry = expiry;
     }
 
@@ -138,12 +152,9 @@ public class SendJob implements Runnable {
                 }
 
                 // Task related SendJob. Need to determine if task is done.
-                if (logger.isSendJobQueueEmpty() && logger.loggerTask != null) {
-                    Logging.infoln("%s...success", logger.loggerTask.name);
-                    Platform.runLater(() -> {
-                        logger.loggerTask.onSuccess();
-                        logger.loggerTask = null;
-                    });
+                if (lastJob && logger.loggerTask != null) {
+                    logger.loggerTask.postRun0(LoggerTask.CAUSE.SUCCESS);
+                    logger.loggerTask = null;
                 }
             }
         } else {
@@ -151,15 +162,16 @@ public class SendJob implements Runnable {
             // Send DATA fail is CRITICAL!!!
             // It means connection broken, logger turn off, ...
 
-            // NonTask SendJob is task unrelated
-            if (!(this instanceof NonTask)) {
-                if (Utils.isNotEmpty(desc)) Logging.errorln("%s...failed", desc);
-                if (logger.loggerTask != null) Logging.errorln("%s...failed", logger.loggerTask.name);
-            }
+            if (Utils.isNotEmpty(desc)) Logging.errorln("%s...failed", desc);
 
-            // Here mark SendJob fail only, let LoggerThread to take further process.
-            success = false;
-            logger.sendJob = null;
+            // Stop attached task if exist.
+            // Otherwise, stop logger entity silently.
+            if (logger.loggerTask != null) {
+                logger.loggerTask.postRun0(LoggerTask.CAUSE.SEND_DATA_FAIL);
+                logger.loggerTask = null;
+            } else {
+                logger.stopLogger();
+            }
         }
     }
 
@@ -182,7 +194,6 @@ public class SendJob implements Runnable {
             @Override
             public void run() {
                 Logging.errorln("[%s] ...no response!", nmeaCmd);
-                Logging.infoln("%s...failed", logger.loggerTask.name);
 
                 // Cancel this SendJob
                 logger.sendJob.cancelNoRespTimer();
@@ -191,15 +202,13 @@ public class SendJob implements Runnable {
                 // Cancel all pending SendJobs
                 logger.cancelAllSendJobs();
 
-                if (logger.loggerTask instanceof LoggerTask.Connect) {
-                    // Reset logger if it is Connect task failure
-                    // Reset logger state and variables
-                    logger.resetLogger();
-                } else {
-                    // Run callback to notify fail
-                    LoggerTask task = logger.loggerTask;
-                    Platform.runLater(task::onFail);
+                // Stop associated task if exist.
+                // Otherwise stop logger entity silently.
+                if (logger.loggerTask != null) {
+                    logger.loggerTask.postRun0(LoggerTask.CAUSE.NO_RESP);
                     logger.loggerTask = null;
+                } else {
+                    logger.stopLogger();
                 }
             }
         }, expiry);
@@ -222,7 +231,7 @@ public class SendJob implements Runnable {
         }
 
         public NonTask(GpsLogger logger, String desc, String nmeaCmd, String nmeaResp, long expiry) {
-            super(logger, desc, nmeaCmd, nmeaResp, expiry);
+            super(logger, desc, nmeaCmd, nmeaResp, false, expiry);
         }
     }
 }

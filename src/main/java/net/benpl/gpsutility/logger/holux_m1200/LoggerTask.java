@@ -15,13 +15,14 @@
 
 package net.benpl.gpsutility.logger.holux_m1200;
 
-abstract public class LoggerTask extends net.benpl.gpsutility.logger.LoggerTask<GpsLogger> {
+abstract public class LoggerTask extends net.benpl.gpsutility.logger.LoggerTask {
     /**
      * Constructor of task.
      *
-     * @param name The name of this task.
+     * @param name      The name of this task.
+     * @param gpsLogger The logger entity to execute this task.
      */
-    public LoggerTask(String name) {
-        super(name);
+    public LoggerTask(String name, GpsLogger gpsLogger) {
+        super(name, gpsLogger);
     }
 }

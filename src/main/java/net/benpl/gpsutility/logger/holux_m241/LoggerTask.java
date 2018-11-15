@@ -18,14 +18,15 @@ package net.benpl.gpsutility.logger.holux_m241;
 /**
  * Inherited from {@link net.benpl.gpsutility.logger.LoggerTask} for MTK specific implementation.
  */
-abstract public class LoggerTask extends net.benpl.gpsutility.logger.LoggerTask<GpsLogger> {
+abstract public class LoggerTask extends net.benpl.gpsutility.logger.LoggerTask {
     /**
      * Constructor of task.
      *
-     * @param name The name of this task.
+     * @param name      The name of this task.
+     * @param gpsLogger The logger entity to execute this task.
      */
-    public LoggerTask(String name) {
-        super(name);
+    public LoggerTask(String name, GpsLogger gpsLogger) {
+        super(name, gpsLogger);
     }
 
     /**
@@ -37,8 +38,8 @@ abstract public class LoggerTask extends net.benpl.gpsutility.logger.LoggerTask<
         private final int bySec;
         private final int byDist;
 
-        public SaveConfig(int rcdMethod, int rcdBy, int bySec, int byDist) {
-            super("Save Config");
+        public SaveConfig(GpsLogger gpsLogger, int rcdMethod, int rcdBy, int bySec, int byDist) {
+            super("Save Config", gpsLogger);
             this.rcdMethod = rcdMethod;
             this.rcdBy = rcdBy;
             this.bySec = bySec;
@@ -46,8 +47,8 @@ abstract public class LoggerTask extends net.benpl.gpsutility.logger.LoggerTask<
         }
 
         @Override
-        public void run(GpsLogger gpsLogger) {
-            gpsLogger.saveConfig(rcdMethod, rcdBy, bySec, byDist);
+        protected void run() {
+            ((GpsLogger) gpsLogger).saveConfig(rcdMethod, rcdBy, bySec, byDist);
         }
     }
 
@@ -57,14 +58,14 @@ abstract public class LoggerTask extends net.benpl.gpsutility.logger.LoggerTask<
     abstract public static class ModUserName extends LoggerTask {
         private final String userName;
 
-        public ModUserName(String userName) {
-            super("Modify UserName");
+        public ModUserName(GpsLogger gpsLogger, String userName) {
+            super("Modify UserName", gpsLogger);
             this.userName = userName;
         }
 
         @Override
-        public void run(GpsLogger gpsLogger) {
-            gpsLogger.modUserName(userName);
+        protected void run() {
+            ((GpsLogger) gpsLogger).modUserName(userName);
         }
     }
 }

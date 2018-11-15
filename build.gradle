@@ -49,6 +49,9 @@ dependencies {
     implementation "org.openjfx:javafx-fxml:$jfxVer:$platform"
     implementation "org.openjfx:javafx-graphics:$jfxVer:$platform"
     implementation "org.openjfx:javafx-controls:$jfxVer:$platform"
+
+    // JetBrains annotations
+    compile "org.jetbrains:annotations:16.0.3"
 }
 
 compileJava {

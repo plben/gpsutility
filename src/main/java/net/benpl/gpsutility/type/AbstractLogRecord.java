@@ -315,11 +315,7 @@ abstract public class AbstractLogRecord {
 
         // GPX:Optional Position Information
         if (utc != null) {
-            wpt.setTime(utc);
-
-            if (milliseconds != null) {
-                utc.setTime(utc.getTime() + milliseconds);
-            }
+            wpt.setTime(new Date(utc.getTime() + (milliseconds == null ? 0 : milliseconds)));
         }
 
         // GPX:Optional Position Information

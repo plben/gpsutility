@@ -15,8 +15,8 @@
 
 package net.benpl.gpsutility.logger;
 
-import javafx.application.Platform;
 import net.benpl.gpsutility.misc.Logging;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.LinkedList;
 
@@ -36,7 +36,7 @@ public final class LoggerThread extends Thread {
 
     private boolean running = false;
 
-    public LoggerThread(GpsLogger logger) {
+    public LoggerThread(@NotNull GpsLogger logger) {
         super(String.format("Thread-[%s]", logger.loggerName));
         this.logger = logger;
     }
@@ -73,7 +73,7 @@ public final class LoggerThread extends Thread {
      *
      * @param jobs The jobs to be executed.
      */
-    public void enqueueSendJob(SendJob... jobs) {
+    public void enqueueSendJob(@NotNull SendJob... jobs) {
         synchronized (this) {
             for (SendJob job : jobs) {
                 egressQueue.addLast(job);
@@ -87,7 +87,7 @@ public final class LoggerThread extends Thread {
      *
      * @param events The jobs to be executed.
      */
-    void enqueueRecvJob(RecvJob... events) {
+    void enqueueRecvJob(@NotNull RecvJob... events) {
         synchronized (this) {
             for (RecvJob event : events) {
                 ingressQueue.addLast(event);
@@ -138,22 +138,6 @@ public final class LoggerThread extends Thread {
                             // In case of failed to handle incoming NMEA, all pending SendJobs are meaningless.
                             // So simply clear the SendJob queue.
                             egressQueue.clear();
-
-                            if (logger.loggerTask instanceof LoggerTask.Connect) {
-                                // Reset logger if it is Connect task failure
-                                // Clear reference to avoid re-enter
-                                logger.loggerThread = null;
-                                // Reset logger state and variables
-                                logger.resetLogger();
-                                // Mark thread as InActive to exit later
-                                running = false;
-                            } else {
-                                // Failed to handle incoming NMEA is not critical issue, so not need to reset logger.
-                                Platform.runLater(() -> {
-                                    logger.loggerTask.onFail();
-                                    logger.loggerTask = null;
-                                });
-                            }
                         }
                     }
 
@@ -161,21 +145,7 @@ public final class LoggerThread extends Thread {
                     // Execute next job only if current job has been answered, or response is not necessary.
                     while (running && logger.sendJob == null && egressQueue.size() > 0) {
                         // Take one job from EgressQueue and execute it.
-                        SendJob job = egressQueue.removeFirst();
-                        job.run();
-
-                        if (!job.success) {
-                            // Send DATA fail is CRITICAL!!!
-                            // It means connection broken, logger turn off,,,
-
-                            // Clear reference to avoid re-enter
-                            logger.loggerThread = null;
-                            // Reset logger state and variables
-                            logger.resetLogger();
-
-                            // Mark thread as InActive to exit later
-                            running = false;
-                        }
+                        egressQueue.removeFirst().run();
                     }
                 } catch (InterruptedException ex) {
                     ex.printStackTrace();

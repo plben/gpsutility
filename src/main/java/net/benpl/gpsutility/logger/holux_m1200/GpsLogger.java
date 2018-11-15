@@ -17,18 +17,17 @@ package net.benpl.gpsutility.logger.holux_m1200;
 
 import javafx.application.Platform;
 import javafx.scene.layout.AnchorPane;
-import net.benpl.gpsutility.export.ExportBuilder;
-import net.benpl.gpsutility.export.ExportType;
 import net.benpl.gpsutility.logger.PrimaryController;
 import net.benpl.gpsutility.logger.SendJob;
 import net.benpl.gpsutility.misc.Logging;
 import net.benpl.gpsutility.misc.Utils;
+import net.benpl.gpsutility.type.AbstractLogParser;
 import net.benpl.gpsutility.type.NmeaHandler;
 
-import javax.xml.bind.JAXBException;
-import java.io.File;
-import java.lang.reflect.InvocationTargetException;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -81,8 +80,6 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
     private int totalBlocks; // How many blocks (1 KB for each) log data
     private byte[] logData;
     private int readAddr;
-    private String uploadFilePath;
-    private List<ExportType> exportTypes;
 
     // FIXME: Need M-1200 specific NMEA commands
 //    /**
@@ -168,12 +165,12 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
                     new SendJob(this, "Query flashID", "PMTK182,2,9", "PMTK182,3,9"), // Query HoluxM1200 for flash ID
                     new SendJob(this, "Query RcdTotal", "PMTK182,2,10", "PMTK182,3,10"), // Query HoluxM1200 for total records
                     new SendJob(this, "Query FailSectors", "PMTK182,2,11", "PMTK182,3,11"), // Query HoluxM1200 for FailSector in flash
-                    new SendJob(this, "Query MtkVersion", "PMTK182,2,12", "PMTK182,3,12") // Query HoluxM1200 for MTK hardware version
+                    new SendJob(this, "Query MtkVersion", "PMTK182,2,12", "PMTK182,3,12", true) // Query HoluxM1200 for MTK hardware version
                     // FIXME: Need M-1200 specific NMEA commands
 //                    new SendJob(this, "Query FwVer", "HOLUX241,3", "HOLUX001,3"), // Query HoluxM241 for firmware version
 //                    new SendJob(this, "Query HwVer", "HOLUX241,7", "HOLUX001,7"), // Query HoluxM241 for hardware version
 //                    new SendJob(this, "Query UserName", "HOLUX241,5", "HOLUX001,5"), // Query HoluxM241 for user name
-//                    new SendJob(this, "Query RcdBy", "HOLUX241,8", "HOLUX001,8") // Query HoluxM241 for record method. (0: BySec, 1: ByDist)
+//                    new SendJob(this, "Query RcdBy", "HOLUX241,8", "HOLUX001,8", true) // Query HoluxM241 for record method. (0: BySec, 1: ByDist)
             );
         }
     }
@@ -215,6 +212,16 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
         NmeaHandler<GpsLogger> handler = NMEA_ROOT.get(segs[0]);
         if (handler != null) return handler.handle(this, segs, 1);
         return true;
+    }
+
+    /**
+     * Return LogParser on log data uploaded from GPS Logger.
+     *
+     * @return The LogParser.
+     */
+    @Override
+    protected AbstractLogParser getParser() {
+        return new LogParser(logData);
     }
 
     /**
@@ -284,11 +291,6 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
                 public boolean handle(GpsLogger logger, String[] segs, int idx) {
                     // Transit SM to SERIALPORT_READY state
                     loggerState = STATE_SERIALPORT_OPENED;
-
-                    if (loggerTask instanceof LoggerTask.Disconnect) {
-                        postDisconnect();
-                    }
-
                     return true;
                 }
             }),
@@ -381,49 +383,10 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
                         readAddr += 0x400;
                         if (readAddr < rcdAddr) {
                             loggerThread.enqueueSendJob(
-                                    new SendJob(logger, null, String.format("PMTK182,7,%08X,00000400", readAddr), String.format("PMTK182,8,%08X", readAddr)) // Read log of 1KB size
+                                    new SendJob(logger, null, String.format("PMTK182,7,%08X,00000400", readAddr), String.format("PMTK182,8,%08X", readAddr), (readAddr + 0x400) >= rcdAddr) // Read log of 1KB size
                             );
                         } else {
                             Logging.infoln("Read data from [%s]...success", loggerName);
-
-                            try {
-                                // Parse the log
-                                Logging.infoln("Parsing log data...");
-                                ExportBuilder<LogParser> exportBuilder = new ExportBuilder<>(logData, LogParser.class);
-                                Logging.infoln("Parse log data...success");
-
-                                // Export to external file one by one
-                                String filePath;
-                                Date now = new Date();
-                                for (ExportType exportType : exportTypes) {
-                                    switch (exportType) {
-                                        case GPX:
-                                            filePath = exportBuilder.toGpx(new File(uploadFilePath, sdf.format(now) + ".pgx"));
-                                            Logging.infoln("Log data exported to: %s", filePath);
-                                            break;
-
-                                        case KML:
-                                            filePath = exportBuilder.toKml(new File(uploadFilePath, sdf.format(now) + ".kml"));
-                                            Logging.infoln("Log data exported to: %s", filePath);
-                                            break;
-
-                                        default:
-                                            break;
-                                    }
-                                }
-                            } catch (JAXBException e) {
-                                e.printStackTrace();
-                                Logging.infoln("Parse log data...failed");
-                            } catch (IllegalAccessException | InstantiationException e) {
-                                e.printStackTrace();
-                                Logging.infoln("Invalid log parser.");
-                            } catch (NoSuchMethodException | InvocationTargetException e) {
-                                e.printStackTrace();
-                                Logging.infoln("Initialize parser...failed");
-                            }
-
-                            // Do not forget to release resources
-                            logData = null;
                         }
                     }
                     return true;
@@ -503,7 +466,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
                         readAddr = 0;
                         logData = null;
                         loggerThread.enqueueSendJob(
-                                new SendJob(logger, null, String.format("PMTK182,7,%08X,00000400", readAddr), String.format("PMTK182,8,%08X", readAddr)) // Read log of 1KB size
+                                new SendJob(logger, null, String.format("PMTK182,7,%08X,00000400", readAddr), String.format("PMTK182,8,%08X", readAddr), (readAddr + 0x400) >= rcdAddr) // Read log of 1KB size
                         );
                     }
                     return true;
@@ -556,7 +519,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 //        if (loggerState == STATE_USB_MODE) {
 //            // If in USB_MODE, transit HOLUX M-241 out of it.
 //            loggerThread.enqueueSendJob(
-//                    new SendJob(this, "Exit USB-Mode", "HOLUX241,2", "HOLUX001,2") // Transit HoluxM241 out from USB_MODE (TODO: Is it PHLX827->PHLX860 for GR245???)
+//                    new SendJob(this, "Exit USB-Mode", "HOLUX241,2", "HOLUX001,2", true) // Transit HoluxM241 out from USB_MODE (TODO: Is it PHLX827->PHLX860 for GR245???)
 //            );
 //            return false;
 //        } else {
@@ -566,11 +529,8 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
     }
 
     @Override
-    protected void uploadTrack(String filePath, List<ExportType> exportTypes) {
+    protected void uploadTrack() {
         Logging.infoln("Reading data from [%s]...", loggerName);
-
-        this.uploadFilePath = filePath;
-        this.exportTypes = exportTypes;
 
         LinkedList<SendJob> jobs = new LinkedList<>();
 
@@ -583,6 +543,14 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 
         // Send these NMEA commands to HOLUX M-1200
         loggerThread.enqueueSendJob(jobs.toArray(new SendJob[0]));
+    }
+
+    /**
+     * Post UploadTrack task to release associated resources.
+     */
+    @Override
+    protected void postUploadTrack() {
+        logData = null;
     }
 
     // FIXME: Need M-1200 specific NMEA commands
@@ -605,7 +573,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 //            jobs[1] = new SendJob(this, "Save ByDist", "PMTK182,1,4," + byDist * 10, "PMTK001,182,1,3"); // Change value of record by distance
 //        }
 //
-//        jobs[2] = new SendJob(this, "Save RcdBy", "HOLUX241,9," + rcdBy, "HOLUX001,9"); // Change record by. (0: BySec, 1: ByDist)
+//        jobs[2] = new SendJob(this, "Save RcdBy", "HOLUX241,9," + rcdBy, "HOLUX001,9", true); // Change record by. (0: BySec, 1: ByDist)
 //
 //        // Send these NMEA commands to HOLUX M-241
 //        loggerThread.enqueueSendJob(jobs);
@@ -620,7 +588,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 //    void modUserName(String userName) {
 //        // Send the NMEA command to HOLUX M-241
 //        loggerThread.enqueueSendJob(
-//                new SendJob(this, null, "HOLUX241,4," + userName, "HOLUX001,4") // Change logger user name
+//                new SendJob(this, null, "HOLUX241,4," + userName, "HOLUX001,4", true) // Change logger user name
 //        );
 //    }
 

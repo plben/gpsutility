@@ -17,16 +17,15 @@ package net.benpl.gpsutility.logger;
 
 import javafx.application.Platform;
 import javafx.scene.layout.AnchorPane;
-import net.benpl.gpsutility.export.ExportType;
 import net.benpl.gpsutility.misc.Logging;
 import net.benpl.gpsutility.serialport.SPort;
 import net.benpl.gpsutility.serialport.SPortProperty;
+import net.benpl.gpsutility.type.AbstractLogParser;
 import net.benpl.gpsutility.type.ILoggerStateListener;
 import net.benpl.gpsutility.type.INmeaListener;
 
 import java.text.SimpleDateFormat;
 import java.util.LinkedHashMap;
-import java.util.List;
 
 /**
  * GPS Logger is the entity to handle tasks from controller.
@@ -181,34 +180,38 @@ abstract public class GpsLogger implements INmeaListener {
     abstract public LinkedHashMap<String, AnchorPane> createLoggerPanel();
 
     /**
-     * Call hook invoked by {@link LoggerTask.Connect#run(GpsLogger)} for pre-condition checking.
+     * Call hook invoked by {@link LoggerTask.Connect#run()} for pre-condition checking.
      *
-     * @return TRUE - {@link LoggerTask.Connect#run(GpsLogger)} can go ahead, FALSE - failed to start this task.
+     * @return TRUE - {@link LoggerTask.Connect#run()} can go ahead, FALSE - failed to start this task.
      */
     abstract protected boolean preConnect();
 
     /**
-     * Call hook invoked by {@link LoggerTask.Disconnect#run(GpsLogger)} for pre-condition checking.
+     * Call hook invoked by {@link LoggerTask.Disconnect#run()} for pre-condition checking.
      *
-     * @return TRUE - {@link LoggerTask.Disconnect#run(GpsLogger)} should continue to invoke {@link #postDisconnect()},
+     * @return TRUE - {@link LoggerTask.Disconnect#run()} should continue to invoke {@link #postDisconnect()},
      * FALSE - disconnect started, keep waiting.
      */
     abstract protected boolean preDisconnect();
 
     /**
-     * Call hook invoked by {@link LoggerTask.Disconnect#run(GpsLogger)} and somewhere else of multi-steps DisconnectLogger procedure.
+     * Call hook invoked by {@link LoggerTask.Disconnect#run()} and somewhere else of multi-steps DisconnectLogger procedure.
      */
     protected void postDisconnect() {
         // Task level
         if (loggerTask instanceof LoggerTask.Disconnect) {
             Logging.infoln("%s...success", loggerTask.name);
-            LoggerTask task = loggerTask;
-            Platform.runLater(task::onSuccess);
-            loggerTask = null;
-        }
+            Platform.runLater(() -> {
+                loggerTask.onSuccess();
+                loggerTask = null;
 
-        // Stop LoggerThread
-        loggerThread.stopThread();
+                // Stop LoggerThread
+                loggerThread.stopThread();
+            });
+        } else {
+            // Stop LoggerThread
+            loggerThread.stopThread();
+        }
     }
 
     /**
@@ -218,25 +221,26 @@ abstract public class GpsLogger implements INmeaListener {
      * all resources, reset Logger entity (variables and state), and exit. Finally, a callback {@link ILoggerStateListener#loggerIdle()}
      * will be invoked to notify {@link PrimaryController} the Logger entity is gone.
      */
-    protected void stopLogger() {
+    void stopLogger() {
         loggerThread.stopThread();
     }
 
     /**
-     * Method to upload logger data from external logger.
+     * Method to upload log data from external logger.
      * Invoked by task {@link LoggerTask.UploadTrack}.
-     *
-     * @param filePath    Folder the logger data will be uploaded to.
-     * @param exportTypes The export file formats.
      */
-    abstract protected void uploadTrack(String filePath, List<ExportType> exportTypes);
+    abstract protected void uploadTrack();
+
+    /**
+     * Post UploadTrack task to release associated resources.
+     */
+    abstract protected void postUploadTrack();
 
     /**
      * Execute the task issued by UI.
      *
      * @param loggerTask The task to be executed.
      */
-    @SuppressWarnings("unchecked")
     final public void execLoggerTask(LoggerTask loggerTask) {
         // Reject if a task is still being executed.
         if (this.loggerTask != null) {
@@ -245,16 +249,12 @@ abstract public class GpsLogger implements INmeaListener {
         }
 
         // Reject if task precondition checking failed.
-        if (!loggerTask.preRun(this)) return;
+        if (!loggerTask.preRun()) return;
 
-        // Start this task if pass above two steps.
-        Logging.infoln("\n%s...start", loggerTask.name);
         // Save task reference
         this.loggerTask = loggerTask;
-        // Task pre-start callback (the chance for UI to enable/disable components before task actually started)
-        this.loggerTask.onStart();
         // Start task
-        this.loggerTask.run(this);
+        this.loggerTask.run0();
     }
 
     /**
@@ -268,15 +268,6 @@ abstract public class GpsLogger implements INmeaListener {
         if (loggerThread != null) {
             loggerThread.enqueueRecvJob(new RecvJob(this, RecvJob.RECV_JOB_NMEA_DATA, nmea));
         }
-    }
-
-    /**
-     * Determine if SendJob queue is empty.
-     *
-     * @return TRUE - empty, FALSE - not empty
-     */
-    protected boolean isSendJobQueueEmpty() {
-        return loggerThread.isEgressQueueEmpty();
     }
 
     /**
@@ -364,4 +355,10 @@ abstract public class GpsLogger implements INmeaListener {
      */
     abstract protected boolean dispatchNmea(String[] segs);
 
+    /**
+     * Return LogParser on log data uploaded from GPS Logger.
+     *
+     * @return The LogParser.
+     */
+    abstract protected AbstractLogParser getParser();
 }

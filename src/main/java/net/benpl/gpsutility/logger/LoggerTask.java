@@ -286,7 +286,7 @@ abstract public class LoggerTask {
 
         @Override
         protected void run() {
-            gpsLogger.loggerThread.enqueueSendJob(new SendJob(gpsLogger, null, nmea, null));
+            gpsLogger.loggerThread.enqueueSendJob(new SendJob(gpsLogger, null, nmea, null, true));
         }
     }
 

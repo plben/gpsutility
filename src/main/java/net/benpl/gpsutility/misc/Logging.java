@@ -18,7 +18,6 @@ package net.benpl.gpsutility.misc;
 import javafx.application.Platform;
 import javafx.scene.control.TextArea;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 
@@ -34,7 +33,6 @@ public class Logging {
     private static int level = INFO;
 
     private static PrintStream origOut = null;
-    private static PrintStream origErr = null;
     private static LogOutputStream los = null;
 
     /**
@@ -46,13 +44,11 @@ public class Logging {
         if (target instanceof TextArea) {
             // Save original system console output stream
             origOut = System.out;
-            origErr = System.err;
 
             // Create output stream to this target
-            los = new LogOutputStream<TextArea>((TextArea) target) {
+            los = new LogOutputStream<>((TextArea) target) {
                 /**
-                 * This method is for design intended logging. In other word, it
-                 * is called by user code programmatically.
+                 * This method is for design intended logging. In other word, it is called by user code programmatically.
                  *
                  * @param text The text message to be printed in log window.
                  */
@@ -65,15 +61,12 @@ public class Logging {
                 }
 
                 /**
-                 * The method is for Exception logging only. It's to capture and
-                 * redirect any unknown message to this target.
+                 * The method is to capture other messages printed to {@link System#out}.
                  *
-                 * @param arg0 The Exception message redirected from console.
-                 * @throws IOException In case of any Exception happened in this
-                 * method.
+                 * @param arg0 The message redirected from {@link System#out}.
                  */
                 @Override
-                public void write(int arg0) throws IOException {
+                public void write(int arg0) {
                     // redirects data to the text area
                     this.target.appendText(Character.toString((char) arg0));
                     // scrolls the text area to the end of data
@@ -86,7 +79,6 @@ public class Logging {
 
             // Redirect system console output to this new print stream
             System.setOut(printStream);
-            System.setErr(printStream);
         } else {
             System.out.println("Redirect log to " + target.getClass().getCanonicalName() + " is not supported!");
         }
@@ -96,18 +88,16 @@ public class Logging {
      * Restore system console output to original state.
      */
     public static void restore() {
-        if (origOut == null || origErr == null) {
+        if (origOut == null) {
             return;
         }
 
         System.setOut(origOut);
-        System.setErr(origErr);
         los = null;
     }
 
     /**
-     * Set logging level for this application. All log messages below this level
-     * will be ignored silently. (ERROR > INFO > DEBUG)
+     * Set logging level for this application. All log messages below this level will be ignored silently. (ERROR > INFO > DEBUG)
      *
      * @param level The log level.
      */
@@ -123,8 +113,7 @@ public class Logging {
      * Called by user to print message as ERROR level.
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
-     * @param args   Arguments referenced by the format specifiers in the format
-     *               string. Refer to {@link java.lang.String#format}.
+     * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
      */
     public static void error(String format, Object... args) {
         print(String.format(format, args));
@@ -134,8 +123,7 @@ public class Logging {
      * Called by user to print message as ERROR level. (followed by '\n')
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
-     * @param args   Arguments referenced by the format specifiers in the format
-     *               string. Refer to {@link java.lang.String#format}.
+     * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
      */
     public static void errorln(String format, Object... args) {
         print(String.format(format, args) + "\n");
@@ -145,8 +133,7 @@ public class Logging {
      * Called by user to print message as INFO level.
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
-     * @param args   Arguments referenced by the format specifiers in the format
-     *               string. Refer to {@link java.lang.String#format}.
+     * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
      */
     public static void info(String format, Object... args) {
         if (INFO >= level) {
@@ -158,8 +145,7 @@ public class Logging {
      * Called by user to print message as INFO level. (followed by '\n')
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
-     * @param args   Arguments referenced by the format specifiers in the format
-     *               string. Refer to {@link java.lang.String#format}.
+     * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
      */
     public static void infoln(String format, Object... args) {
         if (INFO >= level) {
@@ -171,8 +157,7 @@ public class Logging {
      * Called by user to print message as DEBUG level.
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
-     * @param args   Arguments referenced by the format specifiers in the format
-     *               string. Refer to {@link java.lang.String#format}.
+     * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
      */
     public static void debug(String format, Object... args) {
         if (DEBUG >= level) {
@@ -184,8 +169,7 @@ public class Logging {
      * Called by user to print message as DEBUG level. (followed by '\n')
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
-     * @param args   Arguments referenced by the format specifiers in the format
-     *               string. Refer to {@link java.lang.String#format}.
+     * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
      */
     public static void debugln(String format, Object... args) {
         if (DEBUG >= level) {
@@ -205,9 +189,7 @@ public class Logging {
             if (Platform.isFxApplicationThread()) {
                 los.print(text);
             } else {
-                Platform.runLater(() -> {
-                    los.print(text);
-                });
+                Platform.runLater(() -> los.print(text));
             }
         }
     }

@@ -13,7 +13,7 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package net.benpl.gpsutility.type;
+package net.benpl.gpsutility.logger;
 
 import net.benpl.gpsutility.gpx.WptType;
 
@@ -22,10 +22,9 @@ import java.math.BigInteger;
 import java.util.Date;
 
 /**
- * Abstract type of log record to store GPS information of each way point.
- * You may inherit this class to implement the decode logic and store decoded data to this object.
+ * Storage of each log record.
  */
-abstract public class AbstractLogRecord {
+abstract public class LogRecord {
 
     /**
      * When this record occurred. (in UTC format)
@@ -295,7 +294,7 @@ abstract public class AbstractLogRecord {
     }
 
     /**
-     * Convert way point record to GPX format. (GPX 1.1 compliant)
+     * Convert log record to GPX format. (GPX 1.1 compliant)
      *
      * @param wpId The sequence number to name this way point.
      * @return GPX way point.
@@ -376,31 +375,25 @@ abstract public class AbstractLogRecord {
     }
 
     public static class SatInfo {
-
         /**
          * ID of satellite in view.
          */
         public int id;
-
         /**
          * SAT in use.
          */
         public boolean used;
-
         /**
          * Elevation angle in degree of the SID.
          */
         public Integer elevation;
-
         /**
          * Azimuth angle in degree of the SID.
          */
         public Integer azimut;
-
         /**
          * SNR of the SID.
          */
         public Integer snr;
     }
-
 }

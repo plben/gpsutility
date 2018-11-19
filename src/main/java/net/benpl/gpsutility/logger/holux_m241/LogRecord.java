@@ -15,25 +15,29 @@
 
 package net.benpl.gpsutility.logger.holux_m241;
 
-import net.benpl.gpsutility.type.AbstractLogRecord;
+import net.benpl.gpsutility.misc.Utils;
+
+import java.util.AbstractMap;
+import java.util.Date;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
- * Log record to store GPS information of each way point, and how to decode the log data from Holux GR-245.
+ * Holux M-241 implementation of {@link net.benpl.gpsutility.logger.LogRecord}.
  */
-final class LogRecord extends AbstractLogRecord {
-
+final class LogRecord extends net.benpl.gpsutility.logger.LogRecord {
     /**
-     * The maximum used satellites number. Should not exceed the length of {@link AbstractLogRecord#sats}
+     * The maximum used satellites number. Should not exceed the length of {@link net.benpl.gpsutility.logger.LogRecord#sats}
      */
-    static final int MAX_USED_SATELLITES = 32;
-
+    private static final int MAX_USED_SATELLITES = 32;
     /**
      * The FormatRegister value when this record occurred.
      */
-    final int fieldMask;
+    private final int fieldMask;
 
     /**
-     * Create a log record with field mask (Format register).
+     * Constructor.
      *
      * @param fieldMask The value indicates which fields are available in this record.
      */
@@ -49,7 +53,7 @@ final class LogRecord extends AbstractLogRecord {
      * @param offset    Offset on byte buffer.
      * @return The decoded log record on success. Otherwise return NULL.
      */
-    static AbstractLogRecord decode(int fieldMask, byte[] buff, int offset) {
+    static LogRecord decode(int fieldMask, byte[] buff, int offset) {
         try {
             LogRecord record = new LogRecord(fieldMask);
 
@@ -66,7 +70,7 @@ final class LogRecord extends AbstractLogRecord {
 
                 // Decode this field with associated field decoder.
                 // Returned field size (bytes) is added to the buffer index for next round.
-                LogRecordField field = LogRecordField.all.get(bmask);
+                Field field = fields.get(bmask);
                 if (field != null) {
                     idx += field.decode(record, buff, offset + idx);
                 }
@@ -98,12 +102,12 @@ final class LogRecord extends AbstractLogRecord {
             }
 
             // Only take care the known fields. (supported)
-            LogRecordField field = LogRecordField.all.get(bmask);
+            Field field = fields.get(bmask);
             if (field == null) continue;
 
             // Field SID/ELEVATION/AZIMUTH/SNR contains multiple satellites info.
-            if (((fieldMask & LogRecordField.FIELD_MASK_SID) != 0)
-                    && (bmask == LogRecordField.FIELD_MASK_SID || bmask == LogRecordField.FIELD_MASK_ELEVATION || bmask == LogRecordField.FIELD_MASK_AZIMUTH || bmask == LogRecordField.FIELD_MASK_SNR)) {
+            if (((fieldMask & Field.FIELD_MASK_SID) != 0)
+                    && (bmask == Field.FIELD_MASK_SID || bmask == Field.FIELD_MASK_ELEVATION || bmask == Field.FIELD_MASK_AZIMUTH || bmask == Field.FIELD_MASK_SNR)) {
                 size += field.size * MAX_USED_SATELLITES;
             } else {
                 size += field.size;
@@ -116,4 +120,253 @@ final class LogRecord extends AbstractLogRecord {
         return size;
     }
 
+    /**
+     * Pre-defined field decoders.
+     */
+    private static final Map<Integer, Field> fields = Stream.of(
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_UTC, new Field("UTC", 4) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setUtc(new Date(Utils.leReadInt(buff, offset, size) * 1000L));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_VALID, new Field("VALID", 2) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setValid(Utils.leReadInt(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_LATITUDE, new Field("LATITUDE,N/S", 4) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setLatitude(Utils.leReadFloatAsDouble(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_LONGITUDE, new Field("LONGITUDE,E/W", 4) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setLongitude(Utils.leReadFloatAsDouble(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_HEIGHT, new Field("HEIGHT", 3) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setHeight(Utils.leReadFloatAsDouble(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_SPEED, new Field("SPEED", 4) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setSpeed(Utils.leReadFloatAsDouble(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_HEADING, new Field("HEADING", 4) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setHeading(Utils.leReadFloatAsDouble(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_DSTA, new Field("DSTA", 2) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setDsta(Utils.leReadInt(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_DAGE, new Field("DAGE", 4) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setDage(Utils.leReadFloatAsDouble(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_PDOP, new Field("PDOP", 2) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setPdop(Utils.leReadInt(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_HDOP, new Field("HDOP", 2) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setHdop(Utils.leReadInt(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_VDOP, new Field("VDOP", 2) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setVdop(Utils.leReadInt(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_NSAT, new Field("NSAT (USED/VIEW)", 2) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    // BIT[7:0] Number of satellites in view
+                    record.setNsatInView(buff[offset] & 0x00FF);
+                    // BIT[15:8] Number of satellites in use
+                    record.setNsatInUsed(buff[offset + 1] & 0x00FF);
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_SID, new Field("SID", 4) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    // SID->BIT[23:16]􀃎 Number of satellites in view (Duplicated with NSAT???)
+                    // (The first SID contains this info)
+                    int count = Utils.leReadInt(buff, offset + 2, 2);
+                    if (count > MAX_USED_SATELLITES) {
+                        record.setSatCount(MAX_USED_SATELLITES);  // this can't happen ? or...
+                    } else {
+                        record.setSatCount(count);
+                    }
+
+                    int fieldSize;
+                    int idx = offset;
+
+                    for (int i = 0; i < count; i++) {
+                        SatInfo sat = new SatInfo();
+
+                        // SID->BIT[7:0]􀃎 ID of satellite in view
+                        sat.id = buff[idx];
+                        // SID->BIT[8]􀃎 SAT in use
+                        sat.used = (buff[idx + 1] & 0x01) != 0;
+                        idx += size;
+
+                        // ELEVATION
+                        if ((record.fieldMask & Field.FIELD_MASK_ELEVATION) != 0) {
+                            fieldSize = fields.get(Field.FIELD_MASK_ELEVATION).size;
+                            sat.elevation = Utils.leReadInt(buff, idx, fieldSize);
+                            idx += fieldSize;
+                        }
+
+                        // AZIMUTH
+                        if ((record.fieldMask & Field.FIELD_MASK_AZIMUTH) != 0) {
+                            fieldSize = fields.get(Field.FIELD_MASK_AZIMUTH).size;
+                            sat.azimut = Utils.leReadInt(buff, idx, fieldSize);
+                            idx += fieldSize;
+                        }
+
+                        // SNR
+                        if ((record.fieldMask & Field.FIELD_MASK_SNR) != 0) {
+                            fieldSize = fields.get(Field.FIELD_MASK_SNR).size;
+                            sat.snr = Utils.leReadInt(buff, idx, fieldSize);
+                            idx += fieldSize;
+                        }
+
+                        record.getSats()[i] = sat;
+                    }
+
+                    return idx;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_ELEVATION, new Field("ELEVATION", 2) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    // Already handled in SID
+                    return 0;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_AZIMUTH, new Field("AZIMUTH", 2) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    // Already handled in SID
+                    return 0;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_SNR, new Field("SNR", 2) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    // Already handled in SID
+                    return 0;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_RCR, new Field("RCR", 2) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setRcr(Utils.leReadInt(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_MILLISECOND, new Field("MILLISECOND", 2) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setMilliseconds(Utils.leReadInt(buff, offset, size));
+                    return size;
+                }
+            }),
+            new AbstractMap.SimpleEntry<>(Field.FIELD_MASK_DISTANCE, new Field("DISTANCE", 8) {
+                @Override
+                int decode(LogRecord record, byte[] buff, int offset) {
+                    record.setDistance(Utils.leReadDouble(buff, offset, size));
+                    return size;
+                }
+            })
+    ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+    /**
+     * Decoder of each field.
+     */
+    abstract public static class Field {
+        /**
+         * The name of this field.
+         */
+        public final String name;
+        /**
+         * The size (bytes) of this field.
+         */
+        final int size;
+
+        /**
+         * Constructor.
+         *
+         * @param name The name of this field.
+         * @param size The size (bytes) of this field.
+         */
+        Field(String name, int size) {
+            this.name = name;
+            this.size = size;
+        }
+
+        /**
+         * Method to decode this field on byte buffer.
+         *
+         * @param record The log record object to store fields info. It also carries the Field Mask info.
+         * @param buff   The source byte buffer.
+         * @param offset Offset on byte buffer for this field.
+         * @return How many bytes have been consumed after successfully decoded.
+         */
+        abstract int decode(LogRecord record, byte[] buff, int offset);
+
+        // Pre-defined bitmask of each field.
+        private static final int FIELD_MASK_UTC = 0x00000001;
+        private static final int FIELD_MASK_VALID = 0x00000002;
+        private static final int FIELD_MASK_LATITUDE = 0x00000004;
+        private static final int FIELD_MASK_LONGITUDE = 0x00000008;
+        private static final int FIELD_MASK_HEIGHT = 0x00000010;
+        private static final int FIELD_MASK_SPEED = 0x00000020;
+        private static final int FIELD_MASK_HEADING = 0x00000040;
+        private static final int FIELD_MASK_DSTA = 0x00000080;
+        private static final int FIELD_MASK_DAGE = 0x00000100;
+        private static final int FIELD_MASK_PDOP = 0x00000200;
+        private static final int FIELD_MASK_HDOP = 0x00000400;
+        private static final int FIELD_MASK_VDOP = 0x00000800;
+        private static final int FIELD_MASK_NSAT = 0x00001000;
+        private static final int FIELD_MASK_SID = 0x00002000;
+        private static final int FIELD_MASK_ELEVATION = 0x00004000;
+        private static final int FIELD_MASK_AZIMUTH = 0x00008000;
+        private static final int FIELD_MASK_SNR = 0x00010000;
+        private static final int FIELD_MASK_RCR = 0x00020000;
+        private static final int FIELD_MASK_MILLISECOND = 0x00040000;
+        private static final int FIELD_MASK_DISTANCE = 0x00080000;
+    }
 }

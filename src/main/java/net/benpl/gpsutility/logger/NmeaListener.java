@@ -13,16 +13,16 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package net.benpl.gpsutility.logger.holux_gr245;
+package net.benpl.gpsutility.logger;
 
-abstract public class LoggerTask extends net.benpl.gpsutility.logger.LoggerTask {
+/**
+ * Listener on serial port for NMEA sentence.
+ */
+public interface NmeaListener {
     /**
-     * Constructor of task.
+     * NMEA sentence received from serial port.
      *
-     * @param name      The name of this task.
-     * @param gpsLogger The logger entity to execute this task.
+     * @param nmea The received NMEA sentence. (without END_OF_PACKAGE '\n\r')
      */
-    public LoggerTask(String name, GpsLogger gpsLogger) {
-        super(name, gpsLogger);
-    }
+    void recvNmea(String nmea);
 }

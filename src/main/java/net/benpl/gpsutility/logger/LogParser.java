@@ -13,7 +13,7 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package net.benpl.gpsutility.type;
+package net.benpl.gpsutility.logger;
 
 import net.benpl.gpsutility.kml.*;
 import net.benpl.gpsutility.misc.Logging;
@@ -31,25 +31,23 @@ import java.util.LinkedList;
 
 /**
  * Log parser to parse the log data read from external Logger.
- * <p>
- * Different logger model may have different data structure, so you need to extend this class to implement the logic for
- * your logger.
  */
-abstract public class AbstractLogParser {
-
+abstract public class LogParser {
+    /**
+     * Log data received from serial port.
+     */
     protected final byte[] logData;
-
     /**
      * The track list to store all decoded log records.
      */
-    protected final LinkedList<LinkedList<AbstractLogRecord>> trackList = new LinkedList<>();
+    protected final LinkedList<LinkedList<LogRecord>> trackList = new LinkedList<>();
     /**
      * The list to store POI.
      */
-    protected final LinkedList<AbstractLogRecord> poiList = new LinkedList<>();
+    protected final LinkedList<LogRecord> poiList = new LinkedList<>();
 
     // Temporary variables for parsing log data.
-    protected LinkedList<AbstractLogRecord> track = new LinkedList<>();
+    protected LinkedList<LogRecord> track = new LinkedList<>();
 
     // Temporary variables for exporting data to external file
     private double minlat = 90;
@@ -59,7 +57,7 @@ abstract public class AbstractLogParser {
     private int trackId;
     private int tpId;
     private int wpId;
-    private AbstractLogRecord lastRecord;
+    private LogRecord lastRecord;
     private double trackDistance;
 
     /**
@@ -70,16 +68,16 @@ abstract public class AbstractLogParser {
     }
 
     /**
-     * Constructor of log parser.
+     * Constructor.
      *
-     * @param logData Binary log data to be parsed.
+     * @param logData Log data received from serial port.
      */
-    public AbstractLogParser(byte[] logData) {
+    public LogParser(byte[] logData) {
         this.logData = logData;
     }
 
     /**
-     * Method called by {@link net.benpl.gpsutility.logger.PrimaryController} to parse the log data {@link #logData}.
+     * Method to parse the log data. (Implementation GPS Data Logger independent)
      */
     abstract public void parse();
 

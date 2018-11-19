@@ -15,15 +15,17 @@
 
 package net.benpl.gpsutility.logger.debugger;
 
-import javafx.application.Platform;
 import javafx.scene.layout.AnchorPane;
+import net.benpl.gpsutility.logger.ActionListener;
+import net.benpl.gpsutility.logger.LogParser;
+import net.benpl.gpsutility.logger.StateListener;
 import net.benpl.gpsutility.misc.Logging;
-import net.benpl.gpsutility.type.AbstractLogParser;
+import net.benpl.gpsutility.serialport.CommPort;
 
 import java.util.LinkedHashMap;
 
 /**
- * Debugger entity inherited from {@link net.benpl.gpsutility.logger.GpsLogger}.
+ * Debugger implementation of {@link net.benpl.gpsutility.logger.GpsLogger}.
  */
 public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 
@@ -35,38 +37,8 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
     @Override
     public LinkedHashMap<String, AnchorPane> createLoggerPanel() {
         // No addition Panel for Debugger
-        return new LinkedHashMap<String, AnchorPane>() {{
+        return new LinkedHashMap<>() {{
         }};
-    }
-
-    @Override
-    protected boolean preConnect() {
-        return true;
-    }
-
-    @Override
-    protected boolean preDisconnect() {
-        return true;
-    }
-
-    @Override
-    protected void uploadTrack() {
-        // nothing to do
-    }
-
-    @Override
-    protected void postUploadTrack() {
-        // nothing to do
-    }
-
-    @Override
-    protected void serialPortReady() {
-        Logging.infoln("%s...success", loggerTask.getName());
-        // Notify caller the success.
-        Platform.runLater(() -> {
-            loggerTask.onSuccess();
-            loggerTask = null;
-        });
     }
 
     @Override
@@ -75,18 +47,27 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
     }
 
     @Override
-    protected void preSendJob(String nmeaCmd, String nmeaResp) {
-        // nothing to do
+    protected void performConnect(ActionListener actionListener, CommPort commPort, int commBaudRateIdx, int commDataBitsIdx, int commParityIdx, int commStopBitsIdx, int commFlowCtrlIdx, StateListener loggerStateListener) {
+        execActionTask(new ActionTask.Connect(this, actionListener, commPort, commBaudRateIdx, commDataBitsIdx, commParityIdx, commStopBitsIdx, commFlowCtrlIdx, loggerStateListener));
     }
 
     @Override
-    protected boolean dispatchNmea(String[] segs) {
-        // Yes, got it and handled
-        return true;
+    protected void performDisconnect(ActionListener actionListener) {
+        execActionTask(new ActionTask.Disconnect(this, actionListener));
     }
 
     @Override
-    protected AbstractLogParser getParser() {
+    protected void performDebugNmea(ActionListener actionListener, String nmea) {
+        execActionTask(new ActionTask.DebugNmea(this, actionListener, nmea));
+    }
+
+    @Override
+    protected void performUploadTrack(ActionListener actionListener) {
+        Logging.errorln("UploadTrack is not supported.");
+    }
+
+    @Override
+    protected LogParser getParser() {
         return null;
     }
 

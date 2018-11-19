@@ -21,16 +21,17 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.AnchorPane;
+import net.benpl.gpsutility.logger.ActionListener;
+import net.benpl.gpsutility.logger.ActionTask;
 import net.benpl.gpsutility.logger.PrimaryController;
+import net.benpl.gpsutility.logger.StateListener;
 import net.benpl.gpsutility.misc.Logging;
 import net.benpl.gpsutility.misc.Utils;
-import net.benpl.gpsutility.type.IController;
-import net.benpl.gpsutility.type.ILoggerStateListener;
 
 /**
  * Controller of {@link fxml/HoluxM241.fxml}
  */
-public class Controller implements IController {
+public class Controller implements net.benpl.gpsutility.logger.Controller {
 
     private static final ObservableList<Integer> bySecList = FXCollections.observableArrayList(1, 5, 10, 15, 30, 60, 120);
     private static final ObservableList<Integer> byDistList = FXCollections.observableArrayList(50, 100, 150, 300, 500, 1000);
@@ -66,28 +67,28 @@ public class Controller implements IController {
 
     @FXML
     private void saveConfigBtnActionPerformed(ActionEvent event) {
-        gpsLogger.execLoggerTask(new LoggerTask.SaveConfig(gpsLogger, getRcdMethod(), getRecordBy(), getRecordBySec(), getRecordByDist()) {
+        gpsLogger.performSaveConfig(new ActionListener() {
             @Override
             public void onStart() {
-                inExecuting();
+                priorExecution();
             }
 
             @Override
             public void onSuccess() {
-                outExecuting();
+                postExecution();
             }
 
             /**
              * For critical failure, {@link net.benpl.gpsutility.logger.LoggerThread} will notify {@link PrimaryController}
-             * via {@link ILoggerStateListener#loggerIdle()}. This AnchorPane will be removed by {@link PrimaryController}.
+             * via {@link StateListener#stateChanged(int)}. This AnchorPane will be removed by {@link PrimaryController}.
              * So no action is necessary here.
              */
             @Override
-            public void onFail(CAUSE cause) {
+            public void onFail(ActionTask.CAUSE cause) {
                 Logging.errorln("Save logger config ... fail");
-                outExecuting();
+                postExecution();
             }
-        });
+        }, getRcdMethod(), getRecordBy(), getRecordBySec(), getRecordByDist());
     }
 
     @FXML
@@ -98,30 +99,33 @@ public class Controller implements IController {
         String userName = ownerNameInput.getText();
         if (Utils.isEmpty(userName)) return;
 
-        gpsLogger.execLoggerTask(new LoggerTask.ModUserName(gpsLogger, userName) {
+        gpsLogger.performModifyUserName(new ActionListener() {
             @Override
             public void onStart() {
-                inExecuting();
+                priorExecution();
             }
 
             @Override
             public void onSuccess() {
-                outExecuting();
+                postExecution();
             }
 
             /**
              * For critical failure, {@link net.benpl.gpsutility.logger.LoggerThread} will notify {@link PrimaryController}
-             * via {@link ILoggerStateListener#loggerIdle()}. This AnchorPane will be removed by {@link PrimaryController}.
+             * via {@link StateListener#stateChanged(int)}. This AnchorPane will be removed by {@link PrimaryController}.
              * So no action is necessary here.
              */
             @Override
-            public void onFail(CAUSE cause) {
+            public void onFail(ActionTask.CAUSE cause) {
                 Logging.errorln("Modify logger UserName ... fail");
-                outExecuting();
+                postExecution();
             }
-        });
+        }, userName);
     }
 
+    /**
+     * Method to initialize variables and status of this FX page.
+     */
     @Override
     public void initialize() {
         // Record Method radio button group
@@ -149,14 +153,29 @@ public class Controller implements IController {
         rcdByDistChooser.setItems(byDistList);
     }
 
+    /**
+     * Set this FX page related logger entity.
+     *
+     * @param gpsLogger This FX page related logger entity.
+     */
     public void setGpsLogger(GpsLogger gpsLogger) {
         this.gpsLogger = gpsLogger;
     }
 
+    /**
+     * Set user name to TextField {@link #ownerNameInput}.
+     *
+     * @param userName The user name.
+     */
     public void setUserName(String userName) {
         ownerNameInput.setText(userName);
     }
 
+    /**
+     * Set RcdMethod to radio group.
+     *
+     * @param rcdMethod The RcdMethod.
+     */
     public void setRcdMethod(int rcdMethod) {
         if (rcdMethod == 1) {
             rcdMethodOverlap.setSelected(true);
@@ -165,6 +184,11 @@ public class Controller implements IController {
         }
     }
 
+    /**
+     * Get RcdMethod from radio group.
+     *
+     * @return The RcdMethod.
+     */
     public int getRcdMethod() {
         if (rcdMethodOverlap.isSelected()) {
             return 1;
@@ -173,6 +197,11 @@ public class Controller implements IController {
         }
     }
 
+    /**
+     * Set RcdBy to radio group.
+     *
+     * @param rcdBy The RcdBy.
+     */
     public void setRecordBy(int rcdBy) {
         if (rcdBy == 0) {
             rcdBySec.setSelected(true);
@@ -181,6 +210,11 @@ public class Controller implements IController {
         }
     }
 
+    /**
+     * Get RcdBy from radio group.
+     *
+     * @return The RcdBy.
+     */
     public int getRecordBy() {
         if (rcdBySec.isSelected()) {
             return 0;
@@ -189,39 +223,58 @@ public class Controller implements IController {
         }
     }
 
-    public boolean setRecordBySec(int seconds) {
+    /**
+     * Set BySec to ComboBox {@link #rcdBySecChooser}.
+     *
+     * @param bySec The BySec.
+     */
+    public void setRecordBySec(int bySec) {
         for (int i = 0; i < bySecList.size(); i++) {
-            if (seconds == bySecList.get(i)) {
+            if (bySec == bySecList.get(i)) {
                 rcdBySecChooser.getSelectionModel().select(i);
-                return true;
+                return;
             }
         }
-        return false;
+        Logging.errorln("Invalid BySec: %d", bySec);
     }
 
+    /**
+     * Get BySec from ComboBox {@link #bySecList}.
+     *
+     * @return The BySec.
+     */
     public int getRecordBySec() {
         return rcdBySecChooser.getValue();
     }
 
-    public boolean setRecordByDist(int meters) {
+    /**
+     * Set ByDist to ComboBox {@link #rcdByDistChooser}.
+     *
+     * @param byDist The ByDist.
+     */
+    public void setRecordByDist(int byDist) {
         for (int i = 0; i < byDistList.size(); i++) {
-            if (meters == byDistList.get(i)) {
+            if (byDist == byDistList.get(i)) {
                 rcdByDistChooser.getSelectionModel().select(i);
-                return true;
+                return;
             }
         }
-        return false;
+        Logging.errorln("Invalid ByDist: %d", byDist);
     }
 
+    /**
+     * Get ByDist from ComboBox {@link #rcdByDistChooser}.
+     *
+     * @return The ByDist.
+     */
     public int getRecordByDist() {
         return rcdByDistChooser.getVisibleRowCount();
     }
 
     /**
-     * Transit to 'executing' state.
-     * During executing state, no component should be operational.
+     * Method to disable relevant components prior to action performed.
      */
-    private void inExecuting() {
+    private void priorExecution() {
         rcdMethodOverlap.setDisable(true);
         rcdMethodStop.setDisable(true);
         rcdBySec.setDisable(true);
@@ -241,9 +294,9 @@ public class Controller implements IController {
     }
 
     /**
-     * Exit from 'executing' state.
+     * Method to enable relevant components post action performed.
      */
-    private void outExecuting() {
+    private void postExecution() {
         rcdMethodOverlap.setDisable(false);
         rcdMethodStop.setDisable(false);
         rcdBySec.setDisable(false);
@@ -259,5 +312,4 @@ public class Controller implements IController {
         ObservableList<Tab> tabs = ((TabPane) anchorPane.getParent().getParent()).getTabs();
         tabs.forEach(tab -> tab.setDisable(false));
     }
-
 }

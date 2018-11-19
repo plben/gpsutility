@@ -19,41 +19,35 @@ import net.benpl.gpsutility.misc.Logging;
 import net.benpl.gpsutility.misc.Utils;
 
 /**
- * RecvJob is the task for serial port incoming string validating, NMEA unpacking, {@link SendJob} task no response checking,
- * and dispatching to logger entity for NMEA handling.
- * <p>
- * After received string segmentation, {@link net.benpl.gpsutility.serialport.SPort} wraps the segmented string into
- * RecvJob task one by one and enqueues to FIFO queue {@link LoggerThread#ingressQueue}. Logger thread {@link LoggerThread}
- * is responsible for task execution scheduling.
+ * RecvJob is the wrapper of incoming NMEA sentence, to be executed by logger entity working thread.
  */
 final public class RecvJob implements Runnable {
-
-    static final public int RECV_JOB_NMEA_DATA = 1;
-
-    private final GpsLogger logger;
-    private final int jobType;
-    private String nmea;
-
     /**
-     * If NMEA is handled by handler correctly.
+     * The logger entity to execute this job.
+     */
+    private final GpsLogger logger;
+    /**
+     * NMEA sentence received from serial port.
+     */
+    private String nmea;
+    /**
+     * If NMEA sentence is handled correctly.
      */
     boolean success = true;
 
     /**
-     * The job to handle incoming NMEA string from serial port..
+     * Constructor..
      *
-     * @param logger  Logger object to receive the final unpacked NMEA package.
-     * @param jobType RecvJob type.
-     * @param nmea    NMEA string.
+     * @param logger The logger entity which received this NMEA sentence.
+     * @param nmea   The NMEA sentence.
      */
-    public RecvJob(GpsLogger logger, int jobType, String nmea) {
+    public RecvJob(GpsLogger logger, String nmea) {
         this.logger = logger;
-        this.jobType = jobType;
         this.nmea = nmea;
     }
 
     /**
-     * If this job is executed successfully. (NMEA handled without error)
+     * Test if received NMEA sentence has been handled successfully.
      *
      * @return TRUE - success, FALSE - otherwise.
      */
@@ -62,99 +56,89 @@ final public class RecvJob implements Runnable {
     }
 
     /**
-     * Job executed by logger thread {@link LoggerThread}.
-     * Validate the NMEA string, SendJob no response check, unpack the NMEA package and pass to logger object  for later
-     * NMEA handling.
+     * Job body.
      */
     @Override
     public void run() {
-        switch (jobType) {
-            case RECV_JOB_NMEA_DATA:
-                Logging.debugln("==> %s", nmea);
+        Logging.debugln("==> %s", nmea);
 
-                // HOLUX extends it for other purpose.
-                if (nmea.startsWith("===")) {
-                    // Something like:
-                    // ======ShowTLog_Destructor========
-                    // ======USB_Constructor========
-                    break;
+        // HOLUX extends it for other purpose.
+        if (nmea.startsWith("===")) {
+            // Something like:
+            // ======ShowTLog_Destructor========
+            // ======USB_Constructor========
+            return;
+        }
+
+        if ("".equals(nmea.trim())) return;
+
+        int length = nmea.length();
+
+        if (length < 7) {
+            Logging.errorln("Invalid NMEA: string too short");
+            return;
+        }
+
+        if (!nmea.startsWith("$")) {
+            Logging.errorln("Invalid NMEA: not started with '$'");
+            return;
+        }
+
+        if (!nmea.matches("(.*)*[0-9A-Fa-f]{2}$")) {
+            Logging.errorln("Invalid NMEA: ended with [%s]", nmea.substring(length - 3));
+            return;
+        }
+
+        // CheckSum in NMEA package
+        int chk0 = Integer.parseInt(nmea.substring(length - 2), 16);
+        // DataFiled
+        String dataField = nmea.substring(1, length - 3);
+        // CheckSum calculated on DataField
+        int chk1 = Utils.getCheckSum(dataField);
+
+        // Validate CheckSum
+        if (chk0 != chk1) {
+            Logging.errorln("Invalid NMEA: checksum failed 0x%02X <-> 0x%02X", chk1, chk0);
+            return;
+        }
+
+        boolean expected = logger.sendJob != null && logger.sendJob.isRespExpected(dataField);
+        if (expected) {
+            // If the expected response of last SendJob
+            // Cancel NoResp timer at once, otherwise the long time NMEA handling (like export gpx/kml) may cause timeout.
+            logger.sendJob.cancelNoRespTimer();
+
+            // Dispatch NMEA to relevant handler.
+            success = logger.sendJob.handleResp(dataField);
+
+            // SendJob level
+            if (Utils.isNotEmpty(logger.sendJob.desc)) {
+                Logging.debugln("%s...%s", logger.sendJob.desc, success ? "success" : "failed");
+            }
+
+            // Task level
+            if (logger.sendJob instanceof SendJob.NonTask || logger.actionTask == null) {
+                // Task unrelated SendJob. Nothing to do.
+                logger.sendJob = null;
+            } else {
+                // Task related SendJob
+                // Stop the task if it is done or error occurred.
+                if (!success) {
+                    // Task failed
+                    logger.actionTask.postExec(ActionTask.CAUSE.HANDLE_NMEA_FAIL);
+                    logger.actionTask = null;
+                } else if (logger.sendJob.isLastJob()) {
+                    // Task finished successfully
+                    logger.actionTask.postExec(ActionTask.CAUSE.SUCCESS);
+                    logger.actionTask = null;
                 }
 
-                if ("".equals(nmea.trim())) break;
-
-                int length = nmea.length();
-
-                if (length < 7) {
-                    Logging.errorln("Invalid NMEA: string too short");
-                    break;
-                }
-
-                if (!nmea.startsWith("$")) {
-                    Logging.errorln("Invalid NMEA: not started with '$'");
-                    break;
-                }
-
-                if (!nmea.matches("(.*)*[0-9A-Fa-f]{2}$")) {
-                    Logging.errorln("Invalid NMEA: ended with [%s]", nmea.substring(length - 3));
-                    break;
-                }
-
-                // CheckSum in NMEA package
-                int chk0 = Integer.parseInt(nmea.substring(length - 2), 16);
-                // DataFiled
-                String dataField = nmea.substring(1, length - 3);
-                // CheckSum calculated on DataField
-                int chk1 = Utils.getCheckSum(dataField);
-
-                // Validate CheckSum
-                if (chk0 != chk1) {
-                    Logging.errorln("Invalid NMEA: checksum failed 0x%02X <-> 0x%02X", chk1, chk0);
-                    break;
-                }
-
-                boolean expected = logger.sendJob != null && logger.sendJob.isRespExpected(dataField);
-                if (expected) {
-                    // If the expected response of last SendJob
-                    // Cancel the NoResp timer immediately, otherwise the long time NMEA handling (like export gpx/kml) may cause timeout.
-                    logger.sendJob.cancelNoRespTimer();
-                }
-
-                // Dispatch NMEA to relevant handler.
-                success = logger.dispatchNmea(dataField.split(","));
-
-                if (expected) {
-                    // SendJob level
-                    if (Utils.isNotEmpty(logger.sendJob.desc)) {
-                        Logging.debugln("%s...%s", logger.sendJob.desc, success ? "success" : "failed");
-                    }
-
-                    // Task level
-                    // Task unrelated SendJob. Nothing to do.
-                    if (logger.sendJob instanceof SendJob.NonTask || logger.loggerTask == null) {
-                        logger.sendJob = null;
-                        return;
-                    }
-
-                    // Stop the task if it is done or error occurred.
-                    if (!success) {
-                        logger.loggerTask.postRun0(LoggerTask.CAUSE.HANDLE_NMEA_FAIL);
-                        logger.loggerTask = null;
-                    } else if (logger.sendJob.isLastJob()) {
-                        logger.loggerTask.postRun0(LoggerTask.CAUSE.SUCCESS);
-                        logger.loggerTask = null;
-                    }
-
-                    // Release sendJob reference since expected response received.
-                    logger.sendJob = null;
-                } else {
-                    // Don't care other not intended incoming NMEAs
-                    success = true;
-                }
-
-                break;
-
-            default:
-                break;
+                // Release sendJob reference since expected response received.
+                logger.sendJob = null;
+            }
+        } else {
+            // Discard all other not intended incoming NMEAs
+            success = true;
         }
     }
 }

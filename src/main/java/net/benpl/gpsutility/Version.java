@@ -49,7 +49,13 @@ class Version {
     private static final String v1_2 = "V1.2";
 
     /**
-     * Application current version
+     * =================================================================
+     * - Reorganize the code.
      */
-    static final String current = v1_2;
+    private static final String v1_3 = "V1.3";
+
+    /**
+     * Current version
+     */
+    static final String current = v1_3;
 }

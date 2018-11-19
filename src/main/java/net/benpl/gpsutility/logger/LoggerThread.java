@@ -21,46 +21,38 @@ import org.jetbrains.annotations.NotNull;
 import java.util.LinkedList;
 
 /**
- * Working thread of Logger entity.
- * <p>
- * It is created when SerialPort is ready, and will be destroyed when SerialPort is closed. This thread monitors on
- * {@link #ingressQueue} for RecvJob task scheduling in FIFO manner, and {@link #egressQueue} for SendJob task scheduling
- * in same manner.
+ * Working thread of logger entity.
  */
 public final class LoggerThread extends Thread {
-
+    /**
+     * The logger entity this working thread serve for.
+     */
     private final GpsLogger logger;
-
+    /**
+     * For NMEA sentences received from serial port.
+     */
     private final LinkedList<RecvJob> ingressQueue = new LinkedList<>();
+    /**
+     * For NMEA sentences to be sent out to serial port.
+     */
     private final LinkedList<SendJob> egressQueue = new LinkedList<>();
+    /**
+     * To be tested if this thread is running.
+     */
+    boolean running = false;
 
-    private boolean running = false;
-
+    /**
+     * Constructor
+     *
+     * @param logger The logger entity this working thread serve for.
+     */
     public LoggerThread(@NotNull GpsLogger logger) {
-        super(String.format("Thread-[%s]", logger.loggerName));
+        super(String.format("Thread-[%s]", logger.name));
         this.logger = logger;
     }
 
     /**
-     * Determine whether this thread is running.
-     *
-     * @return TRUE: running, FALSE: not running.
-     */
-    boolean isRunning() {
-        return running;
-    }
-
-    /**
-     * Determine if SendJob queue is empty.
-     *
-     * @return TRUE - empty, FALSE - not empty
-     */
-    boolean isEgressQueueEmpty() {
-        return egressQueue.size() == 0;
-    }
-
-    /**
-     * Cancel all pending SendJobs in {@link #egressQueue}.
+     * Method to cancel all pending SendJobs in working thread.
      */
     void cancelSendJobs() {
         synchronized (this) {
@@ -69,9 +61,9 @@ public final class LoggerThread extends Thread {
     }
 
     /**
-     * Enqueue SendJobs to this thread and get it notified.
+     * Method to enqueue SendJobs to working thread and get it notified.
      *
-     * @param jobs The jobs to be executed.
+     * @param jobs Jobs to be executed.
      */
     public void enqueueSendJob(@NotNull SendJob... jobs) {
         synchronized (this) {
@@ -83,9 +75,9 @@ public final class LoggerThread extends Thread {
     }
 
     /**
-     * Enqueue RecvJobs to this thread and get it notified.
+     * Method to enqueue RecvJobs to working thread and get it notified.
      *
-     * @param events The jobs to be executed.
+     * @param events Jobs to be executed.
      */
     void enqueueRecvJob(@NotNull RecvJob... events) {
         synchronized (this) {
@@ -97,11 +89,11 @@ public final class LoggerThread extends Thread {
     }
 
     /**
-     * Mark thread as InActive and get it notified.
+     * Method to stop this working thread.
      */
     void stopThread() {
         if (running) {
-            Logging.infoln("Stopping thread [%s]...", logger.loggerName);
+            Logging.infoln("Stopping thread [%s]...", logger.name);
 
             synchronized (this) {
                 running = false;
@@ -115,12 +107,11 @@ public final class LoggerThread extends Thread {
      */
     @Override
     public void run() {
-        Logging.infoln("Thread [%s]...started", logger.loggerName);
+        Logging.infoln("Thread [%s]...started", logger.name);
 
         logger.sendJob = null;
         ingressQueue.clear();
         egressQueue.clear();
-
         running = true;
 
         while (running) {
@@ -142,7 +133,6 @@ public final class LoggerThread extends Thread {
                     }
 
                     // Handle outgoing SendJobs
-                    // Execute next job only if current job has been answered, or response is not necessary.
                     while (running && logger.sendJob == null && egressQueue.size() > 0) {
                         // Take one job from EgressQueue and execute it.
                         egressQueue.removeFirst().run();
@@ -158,11 +148,10 @@ public final class LoggerThread extends Thread {
         ingressQueue.clear();
         egressQueue.clear();
 
+        Logging.infoln("Thread [%s]...stopped", logger.name);
+
         logger.loggerThread = null;
         logger.resetLogger();
-
-        Logging.infoln("Thread [%s]...stopped", logger.loggerName);
-        Logging.infoln("...disconnected.");
     }
 
 }

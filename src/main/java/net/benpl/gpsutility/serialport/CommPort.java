@@ -18,33 +18,51 @@ package net.benpl.gpsutility.serialport;
 import com.fazecast.jSerialComm.SerialPort;
 import com.fazecast.jSerialComm.SerialPortDataListener;
 import com.fazecast.jSerialComm.SerialPortEvent;
+import net.benpl.gpsutility.logger.NmeaListener;
 import net.benpl.gpsutility.misc.Logging;
-import net.benpl.gpsutility.type.INmeaListener;
 
 import java.nio.charset.StandardCharsets;
 
 import static com.fazecast.jSerialComm.SerialPort.TIMEOUT_NONBLOCKING;
 
 /**
- * Wrapper of {@link com.fazecast.jSerialComm.SerialPort}.
- * <p>
- * This module is responsible for associated serial port configuration, open, close, and listen on it. Uplink data received
- * from serial port will be converted to string, segmented by '\r\n', and passed to upper listeners. Downlink string from
- * upper layer will be appended with '\r\n', converted to byte array, and sent out on the serial port.
+ * CommPort is the wrapper of {@link com.fazecast.jSerialComm.SerialPort}.
  */
-public final class SPort implements SerialPortDataListener {
-
+public final class CommPort implements SerialPortDataListener {
+    /**
+     * Pre-defined tag for end of NMEA package.
+     */
     private final static String END_OF_PACKAGE = "\r\n";
 
+    /**
+     * Name of this wrapped serial port.
+     */
     private final String name;
+    /**
+     * The wrapped serial port.
+     */
     private final SerialPort serialPort;
+    /**
+     * Listener on NMEA sentence.
+     */
+    private NmeaListener nmeaListener = null;
 
-    private INmeaListener nmeaListener = null;
-
+    /**
+     * Byte buffer to receive data from serial port.
+     */
     private final byte[] byteBuff = new byte[6144];
+    /**
+     * String buffer to store data converted from byteBuff.
+     */
     private String strBuff = "";
 
-    public SPort(String name, SerialPort serialPort) {
+    /**
+     * Constructor.
+     *
+     * @param name       Name of this wrapped serial port.
+     * @param serialPort The wrapped serial port.
+     */
+    public CommPort(String name, SerialPort serialPort) {
         this.name = name;
         this.serialPort = serialPort;
     }
@@ -53,13 +71,48 @@ public final class SPort implements SerialPortDataListener {
         return name;
     }
 
+    /**
+     * Get name of this wrapped serial port.
+     *
+     * @return Name of this wrapped serial port.
+     */
     public SerialPort getPort() {
         return serialPort;
     }
 
+    /**
+     * Display name of wrapped serial port by {@link net.benpl.gpsutility.logger.PrimaryController#commPorts}.
+     *
+     * @return Name of this wrapped serial port.
+     */
     @Override
     public String toString() {
         return name;
+    }
+
+    /**
+     * Set parameters for this serial port.
+     *
+     * @param commBaudRate Serial port baud rate.
+     * @param commDataBits Serial port data bits.
+     * @param commParity   Serial port parity.
+     * @param commStopBits Serial port stop bits.
+     * @param commFlowCtrl Serial port flow control.
+     */
+    public void setParameters(int commBaudRate, int commDataBits, int commParity, int commStopBits, int commFlowCtrl) {
+        serialPort.setComPortParameters(commBaudRate, commDataBits, commStopBits, commParity);
+        serialPort.setFlowControl(commFlowCtrl);
+        // Note that write timeouts (2000 milliseconds) are only available on Windows operating systems. This value is ignored on all other systems.
+        serialPort.setComPortTimeouts(TIMEOUT_NONBLOCKING, 0, 2000);
+    }
+
+    /**
+     * Set listener on receiving NMEA sentence.
+     *
+     * @param nmeaListener Listener on NMEA sentence.
+     */
+    public void setNmeaListener(NmeaListener nmeaListener) {
+        this.nmeaListener = nmeaListener;
     }
 
     /**
@@ -131,45 +184,20 @@ public final class SPort implements SerialPortDataListener {
     }
 
     /**
-     * Set properties on serial port.
+     * Method to send NMEA sentence (string) on the serial port.
+     * The sentence will be appended with '\r\n', converted to byte array with US_ASCII charset, and write to serial port.
      *
-     * @param commBaudRate Serial port baud rate.
-     * @param commDataBits Serial port data bits.
-     * @param commParity   Serial port parity.
-     * @param commStopBits Serial port stop bits.
-     * @param commFlowCtrl Serial port flow control.
-     */
-    public void setProperties(int commBaudRate, int commDataBits, int commParity, int commStopBits, int commFlowCtrl) {
-        serialPort.setComPortParameters(commBaudRate, commDataBits, commStopBits, commParity);
-        serialPort.setFlowControl(commFlowCtrl);
-        // Note that write timeouts (2000 milliseconds) are only available on Windows operating systems. This value is ignored on all other systems.
-        serialPort.setComPortTimeouts(TIMEOUT_NONBLOCKING, 0, 2000);
-    }
-
-    /**
-     * Called by logger object to listen on nmea package.
-     *
-     * @param nmeaListener Listener on nmea package.
-     */
-    public void setNmeaListener(INmeaListener nmeaListener) {
-        this.nmeaListener = nmeaListener;
-    }
-
-    /**
-     * Send data (string) on the serial port. The string will be appended with '\r\n', converted to byte array with
-     * US_ASCII charset, and write to the serial port.
-     *
-     * @param data The data (string) to be sent.
+     * @param nmea The NMEA (string) to be sent.
      * @return TRUE - data sent successfully, FALSE - otherwise.
      */
-    public boolean sendData(String data) {
-        byte[] buff = (data + END_OF_PACKAGE).getBytes(StandardCharsets.US_ASCII);
+    public boolean sendData(String nmea) {
+        byte[] buff = (nmea + END_OF_PACKAGE).getBytes(StandardCharsets.US_ASCII);
         int sent = serialPort.writeBytes(buff, buff.length);
         return (sent == buff.length);
     }
 
     /**
-     * Opens this serial port for reading and writing.
+     * Method to open serial port for communication.
      *
      * @return TRUE - opened successfully, FALSE - otherwise.
      */
@@ -180,11 +208,11 @@ public final class SPort implements SerialPortDataListener {
 
         if (serialPort.isOpen()) {
             Logging.infoln("success");
-            serialPort.addDataListener(SPort.this);
+            serialPort.addDataListener(CommPort.this);
             return true;
         } else if (serialPort.openPort()) {
             Logging.infoln("success");
-            serialPort.addDataListener(SPort.this);
+            serialPort.addDataListener(CommPort.this);
             return true;
         } else {
             Logging.infoln("failed");
@@ -193,7 +221,7 @@ public final class SPort implements SerialPortDataListener {
     }
 
     /**
-     * Closes this serial port.
+     * Method to close serial port.
      */
     public void closePort() {
         Logging.info("Close serial port [%s]...", name);
@@ -212,5 +240,4 @@ public final class SPort implements SerialPortDataListener {
             Logging.infoln("success");
         }
     }
-
 }

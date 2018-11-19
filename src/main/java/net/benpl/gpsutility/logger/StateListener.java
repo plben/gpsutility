@@ -13,16 +13,16 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package net.benpl.gpsutility.type;
+package net.benpl.gpsutility.logger;
 
 /**
- * Interface to listen on serial port for NMEA string.
+ * Listener on logger entity state changed.
  */
-public interface INmeaListener {
+public interface StateListener {
     /**
-     * NMEA string received from serial port.
+     * Callback on logger entity state changed.
      *
-     * @param nmea NMEA string received from serial port. ('\n\r' removed)
+     * @param state The new state.
      */
-    void recvNmea(String nmea);
+    void stateChanged(int state);
 }

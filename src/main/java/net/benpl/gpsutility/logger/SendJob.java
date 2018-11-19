@@ -22,16 +22,11 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 /**
- * SendJob is the task for outgoing NMEA command packing, writing data to serial port, and starting no response timer
- * for the sent NMEA command if necessary.
- * <p>
- * To avoid conflict between threads, the task is not executed immediately, but enqueued to a FIFO queue {@link LoggerThread#egressQueue}.
- * {@link LoggerThread} is responsible for schedule these tasks execution sequentially.
+ * SendJob is the wrapper of outgoing NMEA sentence, to be executed by logger entity working thread.
  */
 public class SendJob implements Runnable {
-
     /**
-     * Which Logger entity this job is to be executed.
+     * The logger entity to execute this job.
      */
     private final GpsLogger logger;
     /**
@@ -39,24 +34,25 @@ public class SendJob implements Runnable {
      */
     final String desc;
     /**
-     * NMEA command to be sent out. (Data field only)
+     * NMEA sentence to be sent out. (Data field only)
      */
     private final String nmeaCmd;
     /**
-     * NMEA response to be expected. (Data field only)
+     * NMEA sentence to be expected. (Data field only)
      */
     private final String nmeaResp;
+    /**
+     * Whether this job is the last one.
+     */
     private final boolean lastJob;
     /**
-     * Expiry value of NoResp timer.
+     * Expiry value of NoResp timer. (default to 2000 milliseconds)
      */
     private long expiry = 2000;
-
+    /**
+     * NoResp timer.
+     */
     private Timer noRespTimer = null;
-
-    public boolean isLastJob() {
-        return lastJob;
-    }
 
     /**
      * The job to encapsulate NMEA command and send it out on SerialPort.
@@ -113,14 +109,10 @@ public class SendJob implements Runnable {
     }
 
     /**
-     * Job executed by logger thread {@link LoggerThread}.
-     * Encapsulate NMEA package and send it out to SerialPort. If nmeaResp is not empty, a NoResp TimerTask will be scheduled for it.
+     * Job body
      */
     @Override
     public void run() {
-        // Execute call hook
-        logger.preSendJob(nmeaCmd, nmeaResp);
-
         if (Utils.isNotEmpty(desc)) Logging.debugln("\n%s...start", desc);
 
         // Encapsulate NMEA package
@@ -129,11 +121,11 @@ public class SendJob implements Runnable {
         Logging.debug("<== %s...", nmea);
 
         // Send NMEA package
-        if (logger.sPort.sendData(nmea)) {
+        if (logger.commPort.sendData(nmea)) {
             Logging.debugln("success");
 
             if (Utils.isNotEmpty(nmeaResp)) {
-                // This SendJob is done. But expect to see response.
+                // This SendJob is done. But want to check response.
                 // Save this job for later response checking;
                 logger.sendJob = this;
                 // Start a NoResp timer for this job.
@@ -146,15 +138,14 @@ public class SendJob implements Runnable {
                 if (Utils.isNotEmpty(desc)) Logging.debugln("%s...success", desc);
 
                 // Task level
-                // Task unrelated SendJob. Nothing to do.
                 if (this instanceof NonTask) {
-                    return;
-                }
-
-                // Task related SendJob. Need to determine if task is done.
-                if (lastJob && logger.loggerTask != null) {
-                    logger.loggerTask.postRun0(LoggerTask.CAUSE.SUCCESS);
-                    logger.loggerTask = null;
+                    // Task unrelated SendJob. Nothing to do.
+                } else {
+                    // Task related SendJob. Need to determine if task is done.
+                    if (lastJob && logger.actionTask != null) {
+                        logger.actionTask.postExec(ActionTask.CAUSE.SUCCESS);
+                        logger.actionTask = null;
+                    }
                 }
             }
         } else {
@@ -164,31 +155,68 @@ public class SendJob implements Runnable {
 
             if (Utils.isNotEmpty(desc)) Logging.errorln("%s...failed", desc);
 
-            // Stop attached task if exist.
-            // Otherwise, stop logger entity silently.
-            if (logger.loggerTask != null) {
-                logger.loggerTask.postRun0(LoggerTask.CAUSE.SEND_DATA_FAIL);
-                logger.loggerTask = null;
+            if (logger.actionTask != null) {
+                // Stop attached task if exist.
+                logger.actionTask.postExec(ActionTask.CAUSE.SEND_DATA_FAIL);
+                logger.actionTask = null;
             } else {
-                logger.stopLogger();
+                // Otherwise, stop logger entity silently.
+                logger.loggerThread.stopThread();
             }
         }
     }
 
     /**
-     * Check if NMEA is the expected response.
+     * Test if this job is the last one.
      *
-     * @param nmea The NMEA package passed from {@link RecvJob}. (DataField only)
+     * @return TRUE - the last one; FALSE - not the last one.
      */
-    boolean isRespExpected(String nmea) {
-        return nmea.startsWith(nmeaResp);
+    boolean isLastJob() {
+        return lastJob;
     }
 
     /**
-     * Start a new timer to monitor response from external logger.
+     * Test if received NMEA sentence is the expected response.
+     *
+     * @param nmea The NMEA sentence received from serial port.
+     * @return TRUE - the expected response; FALSE - not expected.
+     */
+    final boolean isRespExpected(String nmea) {
+        return Utils.isNotEmpty(nmeaResp) && nmea.startsWith(nmeaResp);
+    }
+
+    /**
+     * Method to handle received NMEA sentence. (It is tested by {@link #isRespExpected(String)} as expected)
+     *
+     * @param nmea The NMEA sentence received from serial port.
+     * @return TRUE - handled correctly; FALSE - failed to handle.
+     */
+    final boolean handleResp(String nmea) {
+        if (nmea.length() == nmeaResp.length()) {
+            return handle(null);
+        } else if (nmea.length() > nmeaResp.length() + 1) {
+            if (nmea.charAt(nmeaResp.length()) == ',') {
+                return handle(nmea.substring(nmeaResp.length() + 1));
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The handler body to handle received NMEA sentence. (to be override)
+     *
+     * @param nmea The NMEA sentence received from serial port.
+     * @return TRUE - handled correctly; FALSE - failed to handle.
+     */
+    public boolean handle(String nmea) {
+        return true;
+    }
+
+    /**
+     * Start NoResp timer for this job.
      */
     private void startNoRespTimer() {
-        // Start NoResp TimerTask for this job.
         noRespTimer = new Timer("Timer-NoResponse");
         noRespTimer.schedule(new TimerTask() {
             @Override
@@ -202,13 +230,13 @@ public class SendJob implements Runnable {
                 // Cancel all pending SendJobs
                 logger.cancelAllSendJobs();
 
-                // Stop associated task if exist.
-                // Otherwise stop logger entity silently.
-                if (logger.loggerTask != null) {
-                    logger.loggerTask.postRun0(LoggerTask.CAUSE.NO_RESP);
-                    logger.loggerTask = null;
+                if (logger.actionTask != null) {
+                    // Stop associated task if exist.
+                    logger.actionTask.postExec(ActionTask.CAUSE.NO_RESP);
+                    logger.actionTask = null;
                 } else {
-                    logger.stopLogger();
+                    // Otherwise stop logger entity silently.
+                    logger.loggerThread.stopThread();
                 }
             }
         }, expiry);
@@ -224,14 +252,12 @@ public class SendJob implements Runnable {
         }
     }
 
+    /**
+     * Another style SendJob which is none task related.
+     */
     public static class NonTask extends SendJob {
-
         public NonTask(GpsLogger logger, String desc, String nmeaCmd, String nmeaResp) {
             super(logger, desc, nmeaCmd, nmeaResp);
-        }
-
-        public NonTask(GpsLogger logger, String desc, String nmeaCmd, String nmeaResp, long expiry) {
-            super(logger, desc, nmeaCmd, nmeaResp, false, expiry);
         }
     }
 }

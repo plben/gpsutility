@@ -18,147 +18,102 @@ package net.benpl.gpsutility.logger;
 import javafx.application.Platform;
 import javafx.scene.layout.AnchorPane;
 import net.benpl.gpsutility.misc.Logging;
-import net.benpl.gpsutility.serialport.SPort;
-import net.benpl.gpsutility.serialport.SPortProperty;
-import net.benpl.gpsutility.type.AbstractLogParser;
-import net.benpl.gpsutility.type.ILoggerStateListener;
-import net.benpl.gpsutility.type.INmeaListener;
+import net.benpl.gpsutility.serialport.CommPort;
+import net.benpl.gpsutility.serialport.CommProperty;
+import org.jetbrains.annotations.NotNull;
 
-import java.text.SimpleDateFormat;
 import java.util.LinkedHashMap;
 
 /**
- * GPS Logger is the entity to handle tasks from controller.
- * It talks with external real GPS Logger via bound serial port, and notifies controller on task execution success/failure/progress/...
+ * GpsLogger is the entity responsible for communicating with external GPS Data Logger.
+ * <p>
+ * It accepts action performed by controller, talks with external GPS Data Logger via bound serial port, and notifies
+ * controller on execution result (success/failure/progress/...)
  */
-abstract public class GpsLogger implements INmeaListener {
+abstract public class GpsLogger implements NmeaListener {
+
+    // Pre-defined GpsLogger states
+    public static final int STATE_IDLE = 1001;
+    public static final int STATE_SERIALPORT_OPENING = 1002;
+    public static final int STATE_SERIALPORT_OPENED = 1003;
+    public static final int STATE_HANDSHAKED = 1004;
 
     /**
-     * File name formatter for exporting log data to external files.
+     * State of this logger entity
      */
-    protected static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
-
-    // STATE definition of Logger entity
-    protected static final int STATE_IDLE = 1001;
-    protected static final int STATE_SERIALPORT_OPENING = 1002;
-    protected static final int STATE_SERIALPORT_OPENED = 1003;
-    protected static final int STATE_HANDSHAKED = 1004;
-
+    protected int state;
     /**
-     * STATE of this Logger entity
+     * Name of this logger entity
      */
-    protected int loggerState;
-
+    protected final String name;
     /**
-     * NAME of this Logger entity
+     * Serial port bound on this logger entity
      */
-    protected final String loggerName;
-
-    // Bound serial port to talk with external GPS Logger
-    SPort sPort;
-    // Serial port properties
-    int serialPortBaudRateIdx = 4; // 38400
-    int serialPortDataBitsIdx = 4; // 8 bits
-    int serialPortParityIdx = 0; // None
-    int serialPortStopBitsIdx = 0; // 1 bit
-    int serialPortFlowCtrlIdx = 2; // None
+    protected CommPort commPort;
+    /**
+     * Serial port BaudRate (Index of {@link CommProperty#commBaudRateList})
+     */
+    protected int commBaudRateIdx;
+    /**
+     * Serial port DataBits (Index of {@link CommProperty#commDataBitsList})
+     */
+    protected int commDataBitsIdx;
+    /**
+     * Serial port Parity (Index of {@link CommProperty#commParityList})
+     */
+    protected int commParityIdx;
+    /**
+     * Serial port StopBits (Index of {@link CommProperty#commStopBitsList})
+     */
+    protected int commStopBitsIdx;
+    /**
+     * Serial port FlowCtrl (Index of {@link CommProperty#commFlowCtrlList})
+     */
+    protected int commFlowCtrlIdx;
 
     /**
-     * Working thread of this Logger entity.
-     * Once {@link PrimaryController} issues task {@link LoggerTask.Connect} upon a sub-{@link GpsLogger} entity,
-     * {@link LoggerThread} will created immediately. And it will be along with Logger entity except {@link #STATE_IDLE}.state.
+     * The working thread of this logger entity.
+     * It is created when serial port is ready for communication, and stopped when user perform a Disconnect action or in case of failure.
      */
     protected LoggerThread loggerThread;
     /**
-     * The SendJob has been executed, and waiting for expected response.
-     * It is set after {@link SendJob#nmeaCmd} sent out, and removed on receiving of expected response or NoResp timer
-     * timeout.
+     * The task is being executed.
+     * When action performed by controller is accepted, it is wrapped into an ActionTask.
+     */
+    protected ActionTask actionTask;
+    /**
+     * The NMEA command of SendJob has been sent out, and still wait for expected response.
      */
     protected SendJob sendJob;
     /**
-     * The task is being executed.
-     * It is set before a task being executed, and removed after all associated SendJobs successfully sent out and expected
-     * responses received, or in case of any failure.
+     * The listener on logger entity state change.
      */
-    protected LoggerTask loggerTask;
-    /**
-     * The listener on Logger entity state change. (Currently only other states -> {@link #STATE_IDLE})
-     * This listener was set by task {@link LoggerTask.Connect}, and removed when Logger entity go {@link #STATE_IDLE}.
-     */
-    protected ILoggerStateListener loggerStateListener;
+    protected StateListener stateListener;
 
     /**
-     * Constructor of GPS Logger entity.
+     * Constructor.
      *
-     * @param loggerName            Name of this logger.
-     * @param serialPortBaudRateIdx The index of
-     *                              {@link SPortProperty#serialPortBaudRateList}
-     * @param serialPortDataBitsIdx The index of
-     *                              {@link SPortProperty#serialPortDataBitsList}
-     * @param serialPortParityIdx   The index of
-     *                              {@link SPortProperty#serialPortParityList}
-     * @param serialPortStopBitsIdx The index of
-     *                              {@link SPortProperty#serialPortStopBitsList}
-     * @param serialPortFlowCtrlIdx The index of
-     *                              {@link SPortProperty#serialPortFlowCtrlList}
+     * @param name            Name of this logger.
+     * @param commBaudRateIdx The index of {@link CommProperty#commBaudRateList}
+     * @param commDataBitsIdx The index of {@link CommProperty#commDataBitsList}
+     * @param commParityIdx   The index of {@link CommProperty#commParityList}
+     * @param commStopBitsIdx The index of {@link CommProperty#commStopBitsList}
+     * @param commFlowCtrlIdx The index of {@link CommProperty#commFlowCtrlList}
      */
-    public GpsLogger(String loggerName, int serialPortBaudRateIdx, int serialPortDataBitsIdx, int serialPortParityIdx, int serialPortStopBitsIdx, int serialPortFlowCtrlIdx) {
-        this.loggerName = loggerName;
-        // Save SerialPort properties
-        this.serialPortBaudRateIdx = serialPortBaudRateIdx;
-        this.serialPortDataBitsIdx = serialPortDataBitsIdx;
-        this.serialPortParityIdx = serialPortParityIdx;
-        this.serialPortStopBitsIdx = serialPortStopBitsIdx;
-        this.serialPortFlowCtrlIdx = serialPortFlowCtrlIdx;
+    public GpsLogger(String name, int commBaudRateIdx, int commDataBitsIdx, int commParityIdx, int commStopBitsIdx, int commFlowCtrlIdx) {
+        this.name = name;
+        this.commBaudRateIdx = commBaudRateIdx;
+        this.commDataBitsIdx = commDataBitsIdx;
+        this.commParityIdx = commParityIdx;
+        this.commStopBitsIdx = commStopBitsIdx;
+        this.commFlowCtrlIdx = commFlowCtrlIdx;
 
-        this.sPort = null;
-        this.sendJob = null;
-        this.loggerTask = null;
-        this.loggerStateListener = null;
+        this.commPort = null;
         this.loggerThread = null;
-        this.loggerState = STATE_IDLE;
-    }
-
-    /**
-     * Reset logger state and all variables.
-     */
-    final protected void resetLogger() {
-        // The chance for subclass to cleanup resources.
-        this.preResetLogger();
-
-        // Notify PrimaryController this Logger entity is gone.
-        if (this.loggerStateListener != null) {
-            ILoggerStateListener listener = this.loggerStateListener;
-            Platform.runLater(listener::loggerIdle);
-            this.loggerStateListener = null;
-        }
-
-        // Close associated serial port
-        if (sPort != null) {
-            sPort.closePort();
-            sPort = null;
-        }
-
+        this.actionTask = null;
         this.sendJob = null;
-        this.loggerTask = null;
-
-        // Stop this thread if still running
-        if (this.loggerThread != null) {
-            this.loggerThread.stopThread();
-            this.loggerThread = null;
-        }
-
-        this.loggerState = STATE_IDLE;
-    }
-
-    /**
-     * Method to retrieve the Logger name.
-     * You can override this method to return variable name. (e.g. version attached)
-     *
-     * @return The Logger name.
-     */
-    public String getLoggerName() {
-        return loggerName;
+        this.stateListener = null;
+        this.state = STATE_IDLE;
     }
 
     /**
@@ -168,197 +123,192 @@ abstract public class GpsLogger implements INmeaListener {
      */
     @Override
     public String toString() {
-        return loggerName;
+        return name;
     }
 
     /**
-     * On logger ready, this method is called by {@link PrimaryController} to retrieve logger
-     * associated Config/Control Panels and add them to UI as 'Tab' component programmatically.
+     * Get name of this logger entity.
      *
-     * @return The logger associated Config/Control Panels.
+     * @return Logger name.
      */
-    abstract public LinkedHashMap<String, AnchorPane> createLoggerPanel();
+    public String getName() {
+        return name;
+    }
 
     /**
-     * Call hook invoked by {@link LoggerTask.Connect#run()} for pre-condition checking.
+     * Get current state of this logger entity.
      *
-     * @return TRUE - {@link LoggerTask.Connect#run()} can go ahead, FALSE - failed to start this task.
+     * @return Logger state.
      */
-    abstract protected boolean preConnect();
+    public int getState() {
+        return state;
+    }
 
     /**
-     * Call hook invoked by {@link LoggerTask.Disconnect#run()} for pre-condition checking.
+     * Set logger entity to new state.
      *
-     * @return TRUE - {@link LoggerTask.Disconnect#run()} should continue to invoke {@link #postDisconnect()},
-     * FALSE - disconnect started, keep waiting.
+     * @param state New state.
      */
-    abstract protected boolean preDisconnect();
+    public void setState(int state) {
+        StateListener listener = stateListener;
+        ActionTask task = actionTask;
+
+        Platform.runLater(() -> {
+            if (listener != null) {
+                listener.stateChanged(state);
+            }
+            if (task != null) {
+                task.stateChanged(state);
+            }
+        });
+
+        this.state = state;
+    }
 
     /**
-     * Call hook invoked by {@link LoggerTask.Disconnect#run()} and somewhere else of multi-steps DisconnectLogger procedure.
+     * Get LogParser for log data uploaded from GPS Logger.
+     *
+     * @return The LogParser.
      */
-    protected void postDisconnect() {
-        // Task level
-        if (loggerTask instanceof LoggerTask.Disconnect) {
-            Logging.infoln("%s...success", loggerTask.name);
-            Platform.runLater(() -> {
-                loggerTask.onSuccess();
-                loggerTask = null;
+    abstract protected LogParser getParser();
 
-                // Stop LoggerThread
-                loggerThread.stopThread();
-            });
-        } else {
-            // Stop LoggerThread
+    /**
+     * Call hook to reset sub-class state & variables.
+     */
+    abstract protected void preResetLogger();
+
+    /**
+     * Method to reset logger state and all variables.
+     */
+    void resetLogger() {
+        // The chance for subclass to cleanup resources.
+        this.preResetLogger();
+
+        // Close associated serial port
+        if (commPort != null) {
+            commPort.closePort();
+            commPort = null;
+        }
+
+        // Stop this thread if still running
+        if (this.loggerThread != null) {
+            this.loggerThread.stopThread();
+            this.loggerThread = null;
+        }
+
+        // Transit logger entity state to IDLE.
+        // This may cause state changed notifications.
+        this.setState(STATE_IDLE);
+
+        this.stateListener = null;
+        this.actionTask = null;
+        this.sendJob = null;
+    }
+
+    /**
+     * Method to stop working thread.
+     */
+    public void stopThread() {
+        if (loggerThread != null) {
             loggerThread.stopThread();
         }
     }
 
     /**
-     * Method to stop this Logger entity.
-     * <p>
-     * This is achieved by stopping the LoggerThread. After received this STOP notification, LoggerThread will cleanup
-     * all resources, reset Logger entity (variables and state), and exit. Finally, a callback {@link ILoggerStateListener#loggerIdle()}
-     * will be invoked to notify {@link PrimaryController} the Logger entity is gone.
-     */
-    void stopLogger() {
-        loggerThread.stopThread();
-    }
-
-    /**
-     * Method to upload log data from external logger.
-     * Invoked by task {@link LoggerTask.UploadTrack}.
-     */
-    abstract protected void uploadTrack();
-
-    /**
-     * Post UploadTrack task to release associated resources.
-     */
-    abstract protected void postUploadTrack();
-
-    /**
-     * Execute the task issued by UI.
+     * Method to enqueue SendJobs to working thread and get it notified.
      *
-     * @param loggerTask The task to be executed.
+     * @param jobs The jobs to be executed.
      */
-    final public void execLoggerTask(LoggerTask loggerTask) {
-        // Reject if a task is still being executed.
-        if (this.loggerTask != null) {
-            Logging.errorln("LoggerTask [%s] is being executed.", this.loggerTask.name);
-            return;
-        }
-
-        // Reject if task precondition checking failed.
-        if (!loggerTask.preRun()) return;
-
-        // Save task reference
-        this.loggerTask = loggerTask;
-        // Start task
-        this.loggerTask.run0();
+    public void enqueueSendJob(@NotNull SendJob... jobs) {
+        loggerThread.enqueueSendJob(jobs);
     }
 
     /**
-     * NMEA string is received from serial port.
-     * Wrap it into RecvJob and enqueue to the job queue.
-     *
-     * @param nmea NMEA string received from serial port.
+     * Method to cancel all pending SendJobs in working thread.
      */
-    @Override
-    final public void recvNmea(String nmea) {
-        if (loggerThread != null) {
-            loggerThread.enqueueRecvJob(new RecvJob(this, RecvJob.RECV_JOB_NMEA_DATA, nmea));
-        }
-    }
-
-    /**
-     * Cancel all pending SendJobs in {@link LoggerThread#egressQueue}.
-     */
-    protected void cancelAllSendJobs() {
+    void cancelAllSendJobs() {
         if (loggerThread != null) {
             loggerThread.cancelSendJobs();
         }
     }
 
     /**
-     * Get SerialPort BaudRate of this logger.
+     * Execute the task performed by controller.
      *
-     * @return The SerialPort BaudRate index of
-     * {@link net.benpl.gpsutility.serialport.SPortProperty#serialPortBaudRateList}.
+     * @param actionTask The task to be executed.
      */
-    final int getSerialPortBaudRateIdx() {
-        return serialPortBaudRateIdx;
+    protected void execActionTask(ActionTask actionTask) {
+        // Reject if a task is still being executed.
+        if (this.actionTask != null) {
+            Logging.errorln("ActionTask [%s] is still being executed.", this.actionTask.getName());
+            return;
+        }
+
+        // Reject if task precondition checking failed.
+        if (!actionTask.precondition()) return;
+
+        // Execute task
+        if (actionTask.exec()) {
+            // Task done
+            // Post execution handling
+            actionTask.postExec(ActionTask.CAUSE.SUCCESS);
+        }
     }
 
     /**
-     * Get SerialPort DataBits of this logger.
+     * Perform Connect action.
      *
-     * @return The SerialPort DataBits index of
-     * {@link net.benpl.gpsutility.serialport.SPortProperty#serialPortDataBitsList}.
+     * @param actionListener      Listener on action performed.
+     * @param commPort            Serial port connected to the GPS Logger.
+     * @param commBaudRateIdx     The index of {@link CommProperty#commBaudRateList}
+     * @param commDataBitsIdx     The index of {@link CommProperty#commDataBitsList}
+     * @param commParityIdx       The index of {@link CommProperty#commParityList}
+     * @param commStopBitsIdx     The index of {@link CommProperty#commStopBitsList}
+     * @param commFlowCtrlIdx     The index of {@link CommProperty#commFlowCtrlList}
+     * @param loggerStateListener Listener on logger entity state changed.
      */
-    final int getSerialPortDataBitsIdx() {
-        return serialPortDataBitsIdx;
+    abstract protected void performConnect(ActionListener actionListener, CommPort commPort, int commBaudRateIdx, int commDataBitsIdx, int commParityIdx, int commStopBitsIdx, int commFlowCtrlIdx, StateListener loggerStateListener);
+
+    /**
+     * Method to create and return logger specific Config/Control panels.
+     *
+     * @return The created panels.
+     */
+    abstract public LinkedHashMap<String, AnchorPane> createLoggerPanel();
+
+    /**
+     * Perform Disconnect action.
+     *
+     * @param actionListener Listener on action performed.
+     */
+    abstract protected void performDisconnect(ActionListener actionListener);
+
+    /**
+     * Perform DebugNmea action.
+     *
+     * @param actionListener Listener on action performed.
+     * @param nmea           NMEA command to be sent to GPS Logger.
+     */
+    abstract protected void performDebugNmea(ActionListener actionListener, String nmea);
+
+    /**
+     * Perform UploadTrack action.
+     *
+     * @param actionListener Listener on action performed.
+     */
+    abstract protected void performUploadTrack(ActionListener actionListener);
+
+    /**
+     * NMEA string received from serial port.
+     *
+     * @param nmea NMEA string received from serial port.
+     */
+    @Override
+    final public void recvNmea(String nmea) {
+        if (loggerThread != null) {
+            // Wrap it into RecvJob and enqueue to working thread.
+            loggerThread.enqueueRecvJob(new RecvJob(this, nmea));
+        }
     }
 
-    /**
-     * Get SerialPort Parity of this logger.
-     *
-     * @return The SerialPort Parity index of
-     * {@link net.benpl.gpsutility.serialport.SPortProperty#serialPortParityList}.
-     */
-    final int getSerialPortParityIdx() {
-        return serialPortParityIdx;
-    }
-
-    /**
-     * Get SerialPort StopBits of this logger.
-     *
-     * @return The SerialPort StopBits index of
-     * {@link net.benpl.gpsutility.serialport.SPortProperty#serialPortStopBitsList}.
-     */
-    final int getSerialPortStopBitsIdx() {
-        return serialPortStopBitsIdx;
-    }
-
-    /**
-     * Get SerialPort BaudRate of this logger.
-     *
-     * @return The SerialPort FlowCtrl index of
-     * {@link net.benpl.gpsutility.serialport.SPortProperty#serialPortFlowCtrlList}.
-     */
-    final int getSerialPortFlowCtrlIdx() {
-        return serialPortFlowCtrlIdx;
-    }
-
-    /**
-     * Call hook on SerialPort ready.
-     */
-    abstract protected void serialPortReady();
-
-    /**
-     * Call hook to reset logger state.
-     */
-    abstract protected void preResetLogger();
-
-    /**
-     * Call hook prior to NMEA command sending out.
-     *
-     * @param nmeaCmd  NMEA command to be sent out. (DataField only)
-     * @param nmeaResp NMEA response expected. (DataField only)
-     */
-    abstract protected void preSendJob(String nmeaCmd, String nmeaResp);
-
-    /**
-     * Dispatch NMEA to relevant NMEA handler..
-     *
-     * @param segs NMEA data field split by ','.
-     * @return TRUE - handled successfully, FALSE - otherwise
-     */
-    abstract protected boolean dispatchNmea(String[] segs);
-
-    /**
-     * Return LogParser on log data uploaded from GPS Logger.
-     *
-     * @return The LogParser.
-     */
-    abstract protected AbstractLogParser getParser();
 }

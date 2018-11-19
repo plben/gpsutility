@@ -32,11 +32,8 @@ import net.benpl.gpsutility.Loggers;
 import net.benpl.gpsutility.misc.Logging;
 import net.benpl.gpsutility.misc.Settings;
 import net.benpl.gpsutility.misc.Utils;
-import net.benpl.gpsutility.serialport.SPort;
-import net.benpl.gpsutility.serialport.SPortProperty;
-import net.benpl.gpsutility.type.AbstractLogParser;
-import net.benpl.gpsutility.type.IController;
-import net.benpl.gpsutility.type.ILoggerStateListener;
+import net.benpl.gpsutility.serialport.CommPort;
+import net.benpl.gpsutility.serialport.CommProperty;
 
 import javax.xml.bind.JAXBException;
 import java.io.File;
@@ -46,7 +43,7 @@ import java.util.*;
 /**
  * Controller of {@link fxml/PrimaryWindow.fxml}
  */
-public class PrimaryController implements IController, ILoggerStateListener {
+public class PrimaryController implements Controller, StateListener {
 
     /**
      * File name formatter for exporting log data to external files.
@@ -56,10 +53,10 @@ public class PrimaryController implements IController, ILoggerStateListener {
     /**
      * Maintain an available serial port list for referred by {@link #loggerChooser}.
      */
-    private ObservableList<SPort> sPorts = FXCollections.observableArrayList();
+    private ObservableList<CommPort> commPorts = FXCollections.observableArrayList();
 
     /**
-     * The logger is Active.
+     * The logger in Active.
      */
     private GpsLogger activeLogger = null;
 
@@ -86,15 +83,15 @@ public class PrimaryController implements IController, ILoggerStateListener {
     private void loggerChooserActionPerformed(ActionEvent event) {
         GpsLogger logger = loggerChooser.getValue();
 
-        baudRateChooser.setValue(SPortProperty.serialPortBaudRateList.get(logger.getSerialPortBaudRateIdx()));
-        parityChooser.setValue(SPortProperty.serialPortParityList.get(logger.getSerialPortParityIdx()));
-        dataBitsChooser.setValue(SPortProperty.serialPortDataBitsList.get(logger.getSerialPortDataBitsIdx()));
-        stopBitsChooser.setValue(SPortProperty.serialPortStopBitsList.get(logger.getSerialPortStopBitsIdx()));
-        flowCtrlChooser.setValue(SPortProperty.serialPortFlowCtrlList.get(logger.getSerialPortFlowCtrlIdx()));
+        baudRateChooser.setValue(CommProperty.commBaudRateList.get(logger.commBaudRateIdx));
+        parityChooser.setValue(CommProperty.commParityList.get(logger.commParityIdx));
+        dataBitsChooser.setValue(CommProperty.commDataBitsList.get(logger.commDataBitsIdx));
+        stopBitsChooser.setValue(CommProperty.commStopBitsList.get(logger.commStopBitsIdx));
+        flowCtrlChooser.setValue(CommProperty.commFlowCtrlList.get(logger.commFlowCtrlIdx));
     }
 
     @FXML
-    private ComboBox<SPort> sPortChooser;
+    private ComboBox<CommPort> sPortChooser;
 
     @FXML
     private void sPortChooserActionPerformed(ActionEvent event) {
@@ -120,19 +117,19 @@ public class PrimaryController implements IController, ILoggerStateListener {
     }
 
     @FXML
-    private ComboBox<SPortProperty> baudRateChooser;
+    private ComboBox<CommProperty> baudRateChooser;
 
     @FXML
-    private ComboBox<SPortProperty> dataBitsChooser;
+    private ComboBox<CommProperty> dataBitsChooser;
 
     @FXML
-    private ComboBox<SPortProperty> flowCtrlChooser;
+    private ComboBox<CommProperty> flowCtrlChooser;
 
     @FXML
-    private ComboBox<SPortProperty> parityChooser;
+    private ComboBox<CommProperty> parityChooser;
 
     @FXML
-    private ComboBox<SPortProperty> stopBitsChooser;
+    private ComboBox<CommProperty> stopBitsChooser;
 
     @FXML
     private TextField nmeaInput;
@@ -145,26 +142,26 @@ public class PrimaryController implements IController, ILoggerStateListener {
         String text = nmeaInput.getText();
         if (Utils.isEmpty(text)) return;
 
-        activeLogger.execLoggerTask(new LoggerTask.DebugNmea(activeLogger, text) {
+        activeLogger.performDebugNmea(new ActionListener() {
             @Override
             public void onStart() {
-                inExecuting();
+                priorExecution();
             }
 
             @Override
             public void onSuccess() {
-                outExecuting();
+                postExecution();
             }
 
             /**
-             * For critical failure, will got notified by {@link LoggerThread} via {@link ILoggerStateListener#loggerIdle()}.
+             * For critical failure, will got notified by {@link LoggerThread} via {@link StateListener#stateChanged(int)}.
              * So no action is necessary here.
              */
             @Override
-            public void onFail(CAUSE cause) {
-                outExecuting();
+            public void onFail(ActionTask.CAUSE cause) {
+                postExecution();
             }
-        });
+        }, text);
     }
 
     @FXML
@@ -223,11 +220,11 @@ public class PrimaryController implements IController, ILoggerStateListener {
     private void uploadTrackBtnActionPerformed(ActionEvent event) {
         uploadProgress.setProgress(0);
 
-        List<AbstractLogParser.ExportType> exportTypes = new ArrayList<>();
-        if (gpxExport.isSelected()) exportTypes.add(AbstractLogParser.ExportType.GPX);
-        if (kmlExport.isSelected()) exportTypes.add(AbstractLogParser.ExportType.KML);
+        List<LogParser.ExportType> exportTypes = new ArrayList<>();
+        if (gpxExport.isSelected()) exportTypes.add(LogParser.ExportType.GPX);
+        if (kmlExport.isSelected()) exportTypes.add(LogParser.ExportType.KML);
 
-        activeLogger.execLoggerTask(new LoggerTask.UploadTrack(activeLogger) {
+        activeLogger.performUploadTrack(new ActionListener.UploadTrack() {
             @Override
             public void onProgress(double progress) {
                 // Update progress
@@ -236,14 +233,14 @@ public class PrimaryController implements IController, ILoggerStateListener {
 
             @Override
             public void onStart() {
-                inExecuting();
+                priorExecution();
             }
 
             @Override
             public void onSuccess() {
                 try {
                     // Parse the log
-                    AbstractLogParser logParser = activeLogger.getParser();
+                    LogParser logParser = activeLogger.getParser();
                     Logging.infoln("\nParsing log data...");
                     logParser.parse();
                     Logging.infoln("Parse log data...success");
@@ -253,7 +250,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
                     String exportPath = uploadPath.getText();
                     String filename = sdf.format(now);
                     String exported;
-                    for (AbstractLogParser.ExportType exportType : exportTypes) {
+                    for (LogParser.ExportType exportType : exportTypes) {
                         switch (exportType) {
                             case GPX:
                                 exported = logParser.toGpx(new File(exportPath, filename + ".pgx"), now);
@@ -274,20 +271,17 @@ public class PrimaryController implements IController, ILoggerStateListener {
                     Logging.infoln("Parse log data...failed");
                 }
 
-                // Do not forget to release resources
-                activeLogger.postUploadTrack();
-
-                outExecuting();
+                postExecution();
             }
 
             /**
-             * For critical failure, will got notified by {@link LoggerThread} via {@link ILoggerStateListener#loggerIdle()}.
+             * For critical failure, will got notified by {@link LoggerThread} via {@link StateListener#stateChanged(int)}.
              * So no action is necessary here.
              */
             @Override
-            public void onFail(CAUSE cause) {
+            public void onFail(ActionTask.CAUSE cause) {
                 Logging.errorln("Upload track data ... fail");
-                outExecuting();
+                postExecution();
             }
         });
     }
@@ -306,65 +300,66 @@ public class PrimaryController implements IController, ILoggerStateListener {
             // Pickup selected Logger and start it
             GpsLogger logger = loggerChooser.getValue();
 
-            logger.execLoggerTask(new LoggerTask.Connect(
-                    logger,
+            logger.performConnect(
+                    new ActionListener() {
+                        @Override
+                        public void onStart() {
+                            // Initial components state
+                            logWindow.setText("Logger - Connecting...");
+
+                            // Disable logger, serial port, serial port properties selection
+                            loggerChooser.setDisable(true);
+                            sPortChooser.setDisable(true);
+                            baudRateChooser.setDisable(true);
+                            dataBitsChooser.setDisable(true);
+                            parityChooser.setDisable(true);
+                            stopBitsChooser.setDisable(true);
+                            flowCtrlChooser.setDisable(true);
+                            connectBtn.setDisable(true);
+                        }
+
+                        @Override
+                        public void onSuccess() {
+                            // START task executed ... success
+                            activeLogger = logger;
+                            // Install Logger tab(s)
+                            activeLogger.createLoggerPanel().forEach((s, anchorPane) -> {
+                                Tab tab = new Tab(s);
+                                tab.setContent(anchorPane);
+                                tabPane.getTabs().add(tab);
+                            });
+
+                            // Initialize 'Connected' state components
+                            nmeaInput.setDisable(false);
+                            sendNmeaBtn.setDisable(false);
+                            uploadPath.setDisable(false);
+                            uploadTrackBtn.setDisable(false);
+                            gpxExport.setDisable(false);
+                            kmlExport.setDisable(false);
+                            connectBtn.setDisable(false);
+                            connectBtn.setText("Disconnect");
+
+                            logWindow.setText(String.format("Logger - Connected.【%s】", activeLogger.getName()));
+                        }
+
+                        @Override
+                        public void onFail(ActionTask.CAUSE cause) {
+                            // START task executed ... failed
+                            resetToDefault();
+                            logWindow.setText("Logger - Disconnected.");
+                        }
+                    },
                     sPortChooser.getValue(),
                     baudRateChooser.getSelectionModel().getSelectedIndex(),
                     dataBitsChooser.getSelectionModel().getSelectedIndex(),
                     parityChooser.getSelectionModel().getSelectedIndex(),
                     stopBitsChooser.getSelectionModel().getSelectedIndex(),
                     flowCtrlChooser.getSelectionModel().getSelectedIndex(),
-                    this) {
-                @Override
-                public void onStart() {
-                    // Initial components state
-                    logWindow.setText("Logger - Connecting...");
-
-                    // Disable logger, serial port, serial port properties selection
-                    loggerChooser.setDisable(true);
-                    sPortChooser.setDisable(true);
-                    baudRateChooser.setDisable(true);
-                    dataBitsChooser.setDisable(true);
-                    parityChooser.setDisable(true);
-                    stopBitsChooser.setDisable(true);
-                    flowCtrlChooser.setDisable(true);
-                    connectBtn.setDisable(true);
-                }
-
-                @Override
-                public void onSuccess() {
-                    // START task executed ... success
-                    activeLogger = logger;
-                    // Install Logger tab(s)
-                    activeLogger.createLoggerPanel().forEach((s, anchorPane) -> {
-                        Tab tab = new Tab(s);
-                        tab.setContent(anchorPane);
-                        tabPane.getTabs().add(tab);
-                    });
-
-                    // Initialize 'Connected' state components
-                    nmeaInput.setDisable(false);
-                    sendNmeaBtn.setDisable(false);
-                    uploadPath.setDisable(false);
-                    uploadTrackBtn.setDisable(false);
-                    gpxExport.setDisable(false);
-                    kmlExport.setDisable(false);
-                    connectBtn.setDisable(false);
-                    connectBtn.setText("Disconnect");
-
-                    logWindow.setText(String.format("Logger - Connected.【%s】", activeLogger.getLoggerName()));
-                }
-
-                @Override
-                public void onFail(CAUSE cause) {
-                    // START task executed ... failed
-                    resetAll();
-                    logWindow.setText("Logger - Disconnected.");
-                }
-            });
+                    this
+            );
         } else {
             logWindow.setText("Logger - Disconnecting...");
-            activeLogger.execLoggerTask(new LoggerTask.Disconnect(activeLogger) {
+            activeLogger.performDisconnect(new ActionListener() {
                 @Override
                 public void onStart() {
                     // Nothing to do
@@ -372,17 +367,17 @@ public class PrimaryController implements IController, ILoggerStateListener {
 
                 @Override
                 public void onSuccess() {
-                    resetAll();
+                    resetToDefault();
                 }
 
                 /**
-                 * For critical failure, will got notified by {@link LoggerThread} via {@link ILoggerStateListener#loggerIdle()}.
+                 * For critical failure, will got notified by {@link LoggerThread} via {@link StateListener#stateChanged(int)}.
                  * So no action is necessary here.
                  */
                 @Override
-                public void onFail(CAUSE cause) {
-                    Logging.errorln("Disconnect logger [%s] ... fail", activeLogger.loggerName);
-                    resetAll();
+                public void onFail(ActionTask.CAUSE cause) {
+                    Logging.errorln("Disconnect logger [%s] ... fail", activeLogger.name);
+                    resetToDefault();
                 }
             });
         }
@@ -403,6 +398,9 @@ public class PrimaryController implements IController, ILoggerStateListener {
     @FXML
     private RadioButton debugLogLevel;
 
+    /**
+     * Method to initialize variables and status of this FX page.
+     */
     @Override
     public void initialize() {
         // Initial log level
@@ -411,11 +409,11 @@ public class PrimaryController implements IController, ILoggerStateListener {
         Logging.redirectTo(logTextArea);
 
         // Initialize serial port properties ComboBoxes
-        baudRateChooser.setItems(SPortProperty.serialPortBaudRateList);
-        parityChooser.setItems(SPortProperty.serialPortParityList);
-        dataBitsChooser.setItems(SPortProperty.serialPortDataBitsList);
-        stopBitsChooser.setItems(SPortProperty.serialPortStopBitsList);
-        flowCtrlChooser.setItems(SPortProperty.serialPortFlowCtrlList);
+        baudRateChooser.setItems(CommProperty.commBaudRateList);
+        parityChooser.setItems(CommProperty.commParityList);
+        dataBitsChooser.setItems(CommProperty.commDataBitsList);
+        stopBitsChooser.setItems(CommProperty.commStopBitsList);
+        flowCtrlChooser.setItems(CommProperty.commFlowCtrlList);
 
         // Load supported GPS loggers
         loggerChooser.setItems(Loggers.all);
@@ -423,7 +421,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
         loggerChooser.fireEvent(new ActionEvent()); // Fire an action event to trigger refreshing all serial port properties
 
         // Load available serial ports
-        sPortChooser.setItems(sPorts);
+        sPortChooser.setItems(commPorts);
         refreshSerialPort();
 
         // Initialize GPS track upload file/path
@@ -503,7 +501,10 @@ public class PrimaryController implements IController, ILoggerStateListener {
         });
     }
 
-    public void destroy() {
+    /**
+     * Method to perform close action when user click on the 'X' button.
+     */
+    public void onClose() {
         if (serialPortMonitoringTimer != null) {
             serialPortMonitoringTimer.cancel();
             serialPortMonitoringTimer = null;
@@ -514,7 +515,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
         } else {
             // Stop the active logger
             // then exit this application.
-            activeLogger.execLoggerTask(new LoggerTask.Disconnect(activeLogger) {
+            activeLogger.performDisconnect(new ActionListener() {
                 @Override
                 public void onStart() {
                     // Nothing to do
@@ -527,7 +528,7 @@ public class PrimaryController implements IController, ILoggerStateListener {
                 }
 
                 @Override
-                public void onFail(CAUSE cause) {
+                public void onFail(ActionTask.CAUSE cause) {
                     // Exit application, exception case
                     System.exit(0);
                 }
@@ -536,35 +537,35 @@ public class PrimaryController implements IController, ILoggerStateListener {
     }
 
     /**
-     * Called by serialPortMonitoringTimer periodically to update serial port combobox if necessary.
+     * Method called by serialPortMonitoringTimer periodically to update serial port combobox if necessary.
      */
     private void refreshSerialPort() {
-        ObservableList<SPort> ports = FXCollections.observableArrayList();
+        ObservableList<CommPort> ports = FXCollections.observableArrayList();
 
         // Retrieve serial port list from system
         SerialPort[] serialPorts = SerialPort.getCommPorts();
         if (serialPorts != null && serialPorts.length > 0) {
             // Sort the array by name
             Arrays.sort(serialPorts, (SerialPort sp1, SerialPort sp2) -> (sp1.getSystemPortName().compareTo(sp2.getSystemPortName())));
-            // Build SPort list with available SerialPort
+            // Build CommPort list with available SerialPort
             for (SerialPort serialPort : serialPorts) {
-                SPort sPort = new SPort(serialPort.getSystemPortName() + " (" + serialPort.getPortDescription() + ")", serialPort);
-                ports.add(sPort);
+                CommPort commPort = new CommPort(serialPort.getSystemPortName() + " (" + serialPort.getPortDescription() + ")", serialPort);
+                ports.add(commPort);
             }
         }
 
-        // If no available serial port, insert 'No available Serial Port' into SPort list
+        // If no available serial port, insert 'No available Serial Port' into CommPort list
         if (ports.size() == 0) {
-            ports.add(new SPort("No available Serial Port", null));
+            ports.add(new CommPort("No available Serial Port", null));
         }
 
-        // Check if data model of serial port combobox need to be updated
-        if (ports.size() == sPorts.size()) {
+        // Test if data model of serial port combobox need to be updated
+        if (ports.size() == commPorts.size()) {
             // Same serial port number, need to compare one by one
             for (int i = 0; i < ports.size(); i++) {
-                if (!ports.get(i).getName().equals(sPorts.get(i).getName())) {
+                if (!ports.get(i).getName().equals(commPorts.get(i).getName())) {
                     Platform.runLater(() -> {
-                        sPorts.setAll(ports);
+                        commPorts.setAll(ports);
                         sPortChooser.getSelectionModel().select(0);
                     });
                     return;
@@ -573,18 +574,29 @@ public class PrimaryController implements IController, ILoggerStateListener {
         } else {
             // Different serial port number, update combobox directly
             Platform.runLater(() -> {
-                sPorts.setAll(ports);
+                commPorts.setAll(ports);
                 sPortChooser.getSelectionModel().select(0);
             });
         }
     }
 
+    /**
+     * Callback on logger entity state changed.
+     *
+     * @param state The new state.
+     */
     @Override
-    public void loggerIdle() {
-        resetAll();
+    public void stateChanged(int state) {
+        if (state == GpsLogger.STATE_IDLE) {
+            // If logger entity has been transit to IDLE, reset the FX page to default state.
+            resetToDefault();
+        }
     }
 
-    private void resetAll() {
+    /**
+     * Method to reset this FX page to default state.
+     */
+    private void resetToDefault() {
         // Remove Logger tab(s)
         ObservableList<Tab> tabs = tabPane.getTabs();
         tabs.remove(1, tabs.size());
@@ -616,10 +628,9 @@ public class PrimaryController implements IController, ILoggerStateListener {
     }
 
     /**
-     * Transit to 'executing' state.
-     * During executing state, no component should be operational.
+     * Method to disable relevant components prior to action performed.
      */
-    private void inExecuting() {
+    private void priorExecution() {
         connectBtn.setDisable(true);
         uploadPath.setDisable(true);
         uploadTrackBtn.setDisable(true);
@@ -633,9 +644,9 @@ public class PrimaryController implements IController, ILoggerStateListener {
     }
 
     /**
-     * Exit from 'executing' state.
+     * Method to enable relevant components post action performed.
      */
-    private void outExecuting() {
+    private void postExecution() {
         connectBtn.setDisable(false);
         uploadPath.setDisable(false);
         uploadTrackBtn.setDisable(false);
@@ -645,5 +656,4 @@ public class PrimaryController implements IController, ILoggerStateListener {
         kmlExport.setDisable(false);
         tabPane.getTabs().forEach(tab -> tab.setDisable(false));
     }
-
 }

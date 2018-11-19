@@ -50,7 +50,7 @@ public class AppEntry extends Application {
         // Override application default OnClose event handler.
         primaryStage.setOnCloseRequest(event -> {
             // Call Controller to continue this close operation
-            this.primaryController.destroy();
+            this.primaryController.onClose();
             // Consume this event, let Controller to release all pending resources
             event.consume();
         });

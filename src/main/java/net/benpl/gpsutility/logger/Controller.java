@@ -13,19 +13,17 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package net.benpl.gpsutility.type;
+package net.benpl.gpsutility.logger;
 
 import javax.annotation.PostConstruct;
 
 /**
- * Abstract controller for .fxml file.
+ * Controller of .fxml file.
  */
-public interface IController {
-
+public interface Controller {
     /**
-     * Post-construct method for each Config/Control Panel. All components on this Panel should be initialized in this method.
+     * Method to initialize variables and status of this FX page.
      */
     @PostConstruct
     void initialize();
-
 }

@@ -42,42 +42,48 @@ public class Logging {
      */
     public static void redirectTo(Object target) {
         if (target instanceof TextArea) {
-            // Save original system console output stream
+            // Save original console print stream
             origOut = System.out;
 
-            // Create output stream to this target
+            // Create log output stream upon this target object
             los = new LogOutputStream<>((TextArea) target) {
                 /**
-                 * This method is for design intended logging. In other word, it is called by user code programmatically.
+                 * Method to print design intended message.
                  *
-                 * @param text The text message to be printed in log window.
+                 * @param text Design intended message.
                  */
                 @Override
                 public void print(String text) {
-                    // Append output to JTextArea
-                    this.target.appendText(text);
-                    // scrolls the text area to the end of data
-                    this.target.setScrollTop(Double.MAX_VALUE);
+                    printText(text);
                 }
 
                 /**
-                 * The method is to capture other messages printed to {@link System#out}.
+                 * Method to redirect message from {@link System#out}.
                  *
-                 * @param arg0 The message redirected from {@link System#out}.
+                 * @param arg0 Message from {@link System#out}.
                  */
                 @Override
                 public void write(int arg0) {
-                    // redirects data to the text area
-                    this.target.appendText(Character.toString((char) arg0));
-                    // scrolls the text area to the end of data
+                    printText(Character.toString((char) arg0));
+                }
+
+                /**
+                 * Method to print message in log window.
+                 *
+                 * @param text Message to be printed in log window.
+                 */
+                private void printText(String text) {
+                    // Append message to log window
+                    this.target.appendText(text);
+                    // Scroll log window to bottom
                     this.target.setScrollTop(Double.MAX_VALUE);
                 }
             };
 
-            // Create print stream on the output stream
+            // Create print stream upon this new log output stream
             PrintStream printStream = new PrintStream(los);
 
-            // Redirect system console output to this new print stream
+            // Redirect system console to this new print stream
             System.setOut(printStream);
         } else {
             System.out.println("Redirect log to " + target.getClass().getCanonicalName() + " is not supported!");
@@ -85,7 +91,7 @@ public class Logging {
     }
 
     /**
-     * Restore system console output to original state.
+     * Restore system console to original print stream.
      */
     public static void restore() {
         if (origOut == null) {
@@ -110,7 +116,7 @@ public class Logging {
     }
 
     /**
-     * Called by user to print message as ERROR level.
+     * Method to print ERROR message.
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
      * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
@@ -120,7 +126,7 @@ public class Logging {
     }
 
     /**
-     * Called by user to print message as ERROR level. (followed by '\n')
+     * Method to print ERROR message. (appended with '\n')
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
      * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
@@ -130,7 +136,7 @@ public class Logging {
     }
 
     /**
-     * Called by user to print message as INFO level.
+     * Method to print INFO message.
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
      * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
@@ -142,7 +148,7 @@ public class Logging {
     }
 
     /**
-     * Called by user to print message as INFO level. (followed by '\n')
+     * Method to print INFO message. (appended with '\n')
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
      * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
@@ -154,7 +160,7 @@ public class Logging {
     }
 
     /**
-     * Called by user to print message as DEBUG level.
+     * Method to print DEBUG message.
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
      * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
@@ -166,7 +172,7 @@ public class Logging {
     }
 
     /**
-     * Called by user to print message as DEBUG level. (followed by '\n')
+     * Method to print DEBUG message. (appended with '\n')
      *
      * @param format A format string. Refer to {@link java.lang.String#format}.
      * @param args   Arguments referenced by the format specifiers in the format string. Refer to {@link java.lang.String#format}.
@@ -178,13 +184,13 @@ public class Logging {
     }
 
     /**
-     * Internal implementation to print the message.
+     * Method to print message in log window.
      *
-     * @param text Log message to be printed.
+     * @param text The message to be printed.
      */
     private static void print(String text) {
         if (los == null) {
-            System.out.println(text);
+            System.out.print(text);
         } else {
             if (Platform.isFxApplicationThread()) {
                 los.print(text);
@@ -197,7 +203,7 @@ public class Logging {
     /**
      * The wrapper of {@link java.io.OutputStream}
      *
-     * @param <T> The target type of this output stream.
+     * @param <T> Class type of target object.
      */
     abstract static private class LogOutputStream<T> extends OutputStream {
 

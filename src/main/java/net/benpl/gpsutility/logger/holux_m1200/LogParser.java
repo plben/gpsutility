@@ -21,6 +21,10 @@ import net.benpl.gpsutility.logger.LogParserHolux;
  * Holux M-1200 implementation of {@link net.benpl.gpsutility.logger.LogParser}.
  */
 public class LogParser extends LogParserHolux {
+
+    private static final byte[] watermarkHead = new byte[]{'H', 'O', 'L', 'U', 'X', 'M', '1', '2', '0', '0'};
+    private static final byte[][] watermarkTails = new byte[][]{{'L', 'O', 'G', 'G', 'E', 'R'}, {'W', 'A', 'Y', 'P', 'N', 'T'}};
+
     /**
      * Constructor.
      *
@@ -34,7 +38,7 @@ public class LogParser extends LogParserHolux {
      * Calculate record size (bytes) base on field mask.
      *
      * @param fieldMask Field mask indicates which fields are available in this record.
-     * @return The record size in bytes.
+     * @return Record size in bytes.
      */
     @Override
     protected int getRecordSize(int fieldMask) {
@@ -61,7 +65,7 @@ public class LogParser extends LogParserHolux {
      */
     @Override
     protected byte[] getWatermarkHead() {
-        return new byte[]{'H', 'O', 'L', 'U', 'X', 'M', '1', '2', '0', '0'};
+        return watermarkHead;
     }
 
     /**
@@ -71,6 +75,6 @@ public class LogParser extends LogParserHolux {
      */
     @Override
     protected byte[][] getWatermarkTails() {
-        return new byte[][]{{'L', 'O', 'G', 'G', 'E', 'R'}, {'W', 'A', 'Y', 'P', 'N', 'T'}};
+        return watermarkTails;
     }
 }

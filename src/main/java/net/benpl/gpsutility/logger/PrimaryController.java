@@ -48,17 +48,17 @@ public class PrimaryController implements Controller, StateListener {
     /**
      * File name formatter for exporting log data to external files.
      */
-    protected static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+    private static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
 
     /**
-     * Maintain an available serial port list for referred by {@link #loggerChooser}.
+     * Maintain available serial port list referred by {@link #commPortChooser}.
      */
     private ObservableList<CommPort> commPorts = FXCollections.observableArrayList();
 
     /**
-     * The logger in Active.
+     * Logger entity in used.
      */
-    private GpsLogger activeLogger = null;
+    private GpsLogger gpsLogger = null;
 
     /**
      * 'Copy' menu item of log window.
@@ -66,9 +66,9 @@ public class PrimaryController implements Controller, StateListener {
     private MenuItem logCopy;
 
     /**
-     * Timer of serial port monitoring.
+     * Timer to refresh serial port list.
      */
-    private Timer serialPortMonitoringTimer;
+    private Timer serialPortRefreshTimer;
 
     @FXML
     private TabPane tabPane;
@@ -91,14 +91,14 @@ public class PrimaryController implements Controller, StateListener {
     }
 
     @FXML
-    private ComboBox<CommPort> sPortChooser;
+    private ComboBox<CommPort> commPortChooser;
 
     @FXML
     private void sPortChooserActionPerformed(ActionEvent event) {
         logWindow.setText("Logger - Disconnected.");
 
-        if (sPortChooser.getValue() != null) {
-            if (sPortChooser.getValue().getPort() == null) {
+        if (commPortChooser.getValue() != null) {
+            if (commPortChooser.getValue().getPort() == null) {
                 baudRateChooser.setDisable(true);
                 parityChooser.setDisable(true);
                 dataBitsChooser.setDisable(true);
@@ -142,7 +142,7 @@ public class PrimaryController implements Controller, StateListener {
         String text = nmeaInput.getText();
         if (Utils.isEmpty(text)) return;
 
-        activeLogger.performDebugNmea(new ActionListener() {
+        gpsLogger.performDebugNmea(new ActionListener() {
             @Override
             public void onStart() {
                 priorExecution();
@@ -224,7 +224,7 @@ public class PrimaryController implements Controller, StateListener {
         if (gpxExport.isSelected()) exportTypes.add(LogParser.ExportType.GPX);
         if (kmlExport.isSelected()) exportTypes.add(LogParser.ExportType.KML);
 
-        activeLogger.performUploadTrack(new ActionListener.UploadTrack() {
+        gpsLogger.performUploadTrack(new ActionListener.UploadTrack() {
             @Override
             public void onProgress(double progress) {
                 // Update progress
@@ -240,7 +240,7 @@ public class PrimaryController implements Controller, StateListener {
             public void onSuccess() {
                 try {
                     // Parse the log
-                    LogParser logParser = activeLogger.getParser();
+                    LogParser logParser = gpsLogger.getParser();
                     Logging.infoln("\nParsing log data...");
                     logParser.parse();
                     Logging.infoln("Parse log data...success");
@@ -294,10 +294,10 @@ public class PrimaryController implements Controller, StateListener {
 
     @FXML
     private void connectBtnActionPerformed(ActionEvent event) {
-        if (activeLogger == null) {
+        if (gpsLogger == null) {
             logTextArea.setText("");
 
-            // Pickup selected Logger and start it
+            // Pickup selected logger entity and start it
             GpsLogger logger = loggerChooser.getValue();
 
             logger.performConnect(
@@ -309,7 +309,7 @@ public class PrimaryController implements Controller, StateListener {
 
                             // Disable logger, serial port, serial port properties selection
                             loggerChooser.setDisable(true);
-                            sPortChooser.setDisable(true);
+                            commPortChooser.setDisable(true);
                             baudRateChooser.setDisable(true);
                             dataBitsChooser.setDisable(true);
                             parityChooser.setDisable(true);
@@ -321,9 +321,9 @@ public class PrimaryController implements Controller, StateListener {
                         @Override
                         public void onSuccess() {
                             // START task executed ... success
-                            activeLogger = logger;
+                            gpsLogger = logger;
                             // Install Logger tab(s)
-                            activeLogger.createLoggerPanel().forEach((s, anchorPane) -> {
+                            gpsLogger.createLoggerPanel().forEach((s, anchorPane) -> {
                                 Tab tab = new Tab(s);
                                 tab.setContent(anchorPane);
                                 tabPane.getTabs().add(tab);
@@ -339,7 +339,7 @@ public class PrimaryController implements Controller, StateListener {
                             connectBtn.setDisable(false);
                             connectBtn.setText("Disconnect");
 
-                            logWindow.setText(String.format("Logger - Connected.【%s】", activeLogger.getName()));
+                            logWindow.setText(String.format("Logger - Connected.【%s】", gpsLogger.getName()));
                         }
 
                         @Override
@@ -349,7 +349,7 @@ public class PrimaryController implements Controller, StateListener {
                             logWindow.setText("Logger - Disconnected.");
                         }
                     },
-                    sPortChooser.getValue(),
+                    commPortChooser.getValue(),
                     baudRateChooser.getSelectionModel().getSelectedIndex(),
                     dataBitsChooser.getSelectionModel().getSelectedIndex(),
                     parityChooser.getSelectionModel().getSelectedIndex(),
@@ -359,7 +359,7 @@ public class PrimaryController implements Controller, StateListener {
             );
         } else {
             logWindow.setText("Logger - Disconnecting...");
-            activeLogger.performDisconnect(new ActionListener() {
+            gpsLogger.performDisconnect(new ActionListener() {
                 @Override
                 public void onStart() {
                     // Nothing to do
@@ -376,7 +376,7 @@ public class PrimaryController implements Controller, StateListener {
                  */
                 @Override
                 public void onFail(ActionTask.CAUSE cause) {
-                    Logging.errorln("Disconnect logger [%s] ... fail", activeLogger.name);
+                    Logging.errorln("Disconnect logger [%s] ... fail", gpsLogger.name);
                     resetToDefault();
                 }
             });
@@ -421,7 +421,7 @@ public class PrimaryController implements Controller, StateListener {
         loggerChooser.fireEvent(new ActionEvent()); // Fire an action event to trigger refreshing all serial port properties
 
         // Load available serial ports
-        sPortChooser.setItems(commPorts);
+        commPortChooser.setItems(commPorts);
         refreshSerialPort();
 
         // Initialize GPS track upload file/path
@@ -477,11 +477,11 @@ public class PrimaryController implements Controller, StateListener {
         });
 
         // Schedule TimerTask to refresh Serial Port
-        serialPortMonitoringTimer = new Timer("Timer-SerialPortMonitoring");
-        serialPortMonitoringTimer.schedule(new TimerTask() {
+        serialPortRefreshTimer = new Timer("Timer-RefreshSerialPort");
+        serialPortRefreshTimer.schedule(new TimerTask() {
             @Override
             public void run() {
-                if (activeLogger == null) {
+                if (gpsLogger == null) {
                     refreshSerialPort();
                 }
             }
@@ -505,17 +505,17 @@ public class PrimaryController implements Controller, StateListener {
      * Method to perform close action when user click on the 'X' button.
      */
     public void onClose() {
-        if (serialPortMonitoringTimer != null) {
-            serialPortMonitoringTimer.cancel();
-            serialPortMonitoringTimer = null;
+        if (serialPortRefreshTimer != null) {
+            serialPortRefreshTimer.cancel();
+            serialPortRefreshTimer = null;
         }
 
-        if (activeLogger == null) {
+        if (gpsLogger == null) {
             Platform.exit();
         } else {
             // Stop the active logger
             // then exit this application.
-            activeLogger.performDisconnect(new ActionListener() {
+            gpsLogger.performDisconnect(new ActionListener() {
                 @Override
                 public void onStart() {
                     // Nothing to do
@@ -537,9 +537,12 @@ public class PrimaryController implements Controller, StateListener {
     }
 
     /**
-     * Method called by serialPortMonitoringTimer periodically to update serial port combobox if necessary.
+     * Method called by {@link #serialPortRefreshTimer} periodically to update {@link #commPortChooser} if necessary.
      */
     private void refreshSerialPort() {
+        // Do not refresh serial port list during ACTIVE state.
+        if (gpsLogger != null) return;
+
         ObservableList<CommPort> ports = FXCollections.observableArrayList();
 
         // Retrieve serial port list from system
@@ -547,7 +550,7 @@ public class PrimaryController implements Controller, StateListener {
         if (serialPorts != null && serialPorts.length > 0) {
             // Sort the array by name
             Arrays.sort(serialPorts, (SerialPort sp1, SerialPort sp2) -> (sp1.getSystemPortName().compareTo(sp2.getSystemPortName())));
-            // Build CommPort list with available SerialPort
+            // Build CommPort list with available serial port
             for (SerialPort serialPort : serialPorts) {
                 CommPort commPort = new CommPort(serialPort.getSystemPortName() + " (" + serialPort.getPortDescription() + ")", serialPort);
                 ports.add(commPort);
@@ -559,23 +562,23 @@ public class PrimaryController implements Controller, StateListener {
             ports.add(new CommPort("No available Serial Port", null));
         }
 
-        // Test if data model of serial port combobox need to be updated
+        // Test if data model of {@link #commPortChooser} need to be updated
         if (ports.size() == commPorts.size()) {
             // Same serial port number, need to compare one by one
             for (int i = 0; i < ports.size(); i++) {
                 if (!ports.get(i).getName().equals(commPorts.get(i).getName())) {
                     Platform.runLater(() -> {
                         commPorts.setAll(ports);
-                        sPortChooser.getSelectionModel().select(0);
+                        commPortChooser.getSelectionModel().select(0);
                     });
                     return;
                 }
             }
         } else {
-            // Different serial port number, update combobox directly
+            // Serial port number changed, update {@link #commPortChooser} directly
             Platform.runLater(() -> {
                 commPorts.setAll(ports);
-                sPortChooser.getSelectionModel().select(0);
+                commPortChooser.getSelectionModel().select(0);
             });
         }
     }
@@ -613,7 +616,7 @@ public class PrimaryController implements Controller, StateListener {
         sendNmeaBtn.setDisable(true);
         // Enable logger, serial port, serial port properties selection
         loggerChooser.setDisable(false);
-        sPortChooser.setDisable(false);
+        commPortChooser.setDisable(false);
         baudRateChooser.setDisable(false);
         dataBitsChooser.setDisable(false);
         parityChooser.setDisable(false);
@@ -623,7 +626,7 @@ public class PrimaryController implements Controller, StateListener {
         connectBtn.setDisable(false);
         connectBtn.setText("Connect");
 
-        activeLogger = null;
+        gpsLogger = null;
         logWindow.setText("Logger - Disconnected.");
     }
 

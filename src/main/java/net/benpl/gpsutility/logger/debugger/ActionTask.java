@@ -36,13 +36,13 @@ abstract public class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
     }
 
     /**
-     * Connect task - Connect to external GPS Data Logger.
+     * Connect task - Connect to GPS Data Logger.
      */
     public static class Connect extends net.benpl.gpsutility.logger.ActionTask.Connect<GpsLogger> {
         /**
          * Constructor.
          *
-         * @param gpsLogger       The logger entity to execute this task.
+         * @param gpsLogger       Logger entity to execute this task.
          * @param actionListener  Listener on task execution.
          * @param commPort        Serial port to talk with this logger.
          * @param commBaudRateIdx Index of {@link CommProperty#commBaudRateList}
@@ -70,13 +70,13 @@ abstract public class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
     }
 
     /**
-     * Disconnect task - Disconnect from external GPS Data Logger.
+     * Disconnect task - Disconnect from GPS Data Logger.
      */
     public static class Disconnect extends net.benpl.gpsutility.logger.ActionTask.Disconnect<GpsLogger> {
         /**
          * Constructor.
          *
-         * @param gpsLogger      The logger entity to execute this task.
+         * @param gpsLogger      Logger entity to execute this task.
          * @param actionListener Listener on task execution.
          */
         public Disconnect(GpsLogger gpsLogger, ActionListener actionListener) {
@@ -96,15 +96,15 @@ abstract public class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
     }
 
     /**
-     * DebugNmea task - Send NMEA sentence to external GPS Data Logger for debug purpose.
+     * DebugNmea task - Send NMEA sentence to GPS Data Logger for debug purpose.
      */
     public static class DebugNmea extends net.benpl.gpsutility.logger.ActionTask.DebugNmea<GpsLogger> {
         /**
          * Constructor.
          *
-         * @param gpsLogger      The logger entity to execute this task.
+         * @param gpsLogger      Logger entity to execute this task.
          * @param actionListener Listener on task execution.
-         * @param nmea           The NMEA command to be sent for debug purpose.
+         * @param nmea           The NMEA sentence to be sent for debug purpose.
          */
         public DebugNmea(GpsLogger gpsLogger, ActionListener actionListener, String nmea) {
             super(gpsLogger, actionListener, nmea);

@@ -19,7 +19,7 @@ import net.benpl.gpsutility.misc.Logging;
 import net.benpl.gpsutility.misc.Utils;
 
 /**
- * RecvJob is the wrapper of incoming NMEA sentence, to be executed by logger entity working thread.
+ * RecvJob is the wrapper of incoming NMEA sentence, to be executed by working thread of logger entity.
  */
 final public class RecvJob implements Runnable {
     /**

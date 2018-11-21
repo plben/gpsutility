@@ -22,7 +22,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 /**
- * SendJob is the wrapper of outgoing NMEA sentence, to be executed by logger entity working thread.
+ * SendJob is the wrapper of outgoing NMEA sentence, to be executed by working thread of logger entity.
  */
 public class SendJob implements Runnable {
     /**
@@ -46,57 +46,47 @@ public class SendJob implements Runnable {
      */
     private final boolean lastJob;
     /**
-     * Expiry value of NoResp timer. (default to 2000 milliseconds)
+     * Expiry value of NoResp timer.
      */
-    private long expiry = 2000;
+    private final long expiry;
     /**
      * NoResp timer.
      */
     private Timer noRespTimer = null;
 
     /**
-     * The job to encapsulate NMEA command and send it out on SerialPort.
+     * Constructor.
      *
-     * @param logger   Logger to handle this job.
+     * @param logger   Logger entity to handle this job.
      * @param desc     Brief description of this job.
-     * @param nmeaCmd  The NMEA command to send out.
-     * @param nmeaResp The expected NMEA response.
+     * @param nmeaCmd  NMEA sentence to be send out.
+     * @param nmeaResp NMEA sentence to be expected.
      */
     public SendJob(GpsLogger logger, String desc, String nmeaCmd, String nmeaResp) {
-        this.logger = logger;
-        this.desc = desc;
-        this.nmeaCmd = nmeaCmd;
-        this.nmeaResp = nmeaResp;
-        this.lastJob = false;
+        this(logger, desc, nmeaCmd, nmeaResp, false);
     }
 
     /**
-     * The job to encapsulate NMEA command and send it out on SerialPort.
+     * Constructor.
      *
-     * @param logger   Logger to handle this job.
+     * @param logger   Logger entity to handle this job.
      * @param desc     Brief description of this job.
-     * @param nmeaCmd  The NMEA command to send out.
-     * @param nmeaResp The expected NMEA response.
-     * @param lastJob  Is this the last job.
+     * @param nmeaCmd  NMEA sentence to be send out.
+     * @param nmeaResp NMEA sentence to be expected.
+     * @param lastJob  Last job indicator.
      */
     public SendJob(GpsLogger logger, String desc, String nmeaCmd, String nmeaResp, boolean lastJob) {
-        this.logger = logger;
-        this.desc = desc;
-        this.nmeaCmd = nmeaCmd;
-        this.nmeaResp = nmeaResp;
-        this.lastJob = lastJob;
+        this(logger, desc, nmeaCmd, nmeaResp, lastJob, 2000);
     }
 
     /**
-     * The job to encapsulate NMEA command and send it out on SerialPort.
-     * It is for long time NMEA command, like format/erase logger. You can adjust the expiry value of NoResp timer to
-     * adapt some special NMEA commands.
+     * Constructor.
      *
-     * @param logger   Logger to handle this job.
+     * @param logger   Logger entity to handle this job.
      * @param desc     Brief description of this job.
-     * @param nmeaCmd  The NMEA command to send out.
-     * @param nmeaResp The expected NMEA response.
-     * @param lastJob  Is this the last job.
+     * @param nmeaCmd  NMEA sentence to be send out.
+     * @param nmeaResp NMEA sentence to be expected.
+     * @param lastJob  Last job indicator.
      * @param expiry   Expiry value of NoResp timer.
      */
     public SendJob(GpsLogger logger, String desc, String nmeaCmd, String nmeaResp, boolean lastJob, long expiry) {

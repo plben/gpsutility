@@ -26,11 +26,12 @@ import javax.xml.bind.Marshaller;
 import javax.xml.bind.PropertyException;
 import java.io.File;
 import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedList;
 
 /**
- * Log parser to parse the log data read from external Logger.
+ * Log parser to parse the log data read from GPS Data Logger.
  */
 abstract public class LogParser {
     /**
@@ -203,7 +204,8 @@ abstract public class LogParser {
         // kml<-Document<-Name
         document.setNameRevised("GPS Device");
         // kml<-Document<-Snippet
-        document.setSnippetRevised("Created " + XsdDateTimeConverter.sdf.format(timestamp));
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        document.setSnippetRevised("Created " + sdf.format(timestamp));
 
         // kml<-Document<-TrackStyle(Normal)
         StyleType trackStyleNormal = kmlFactory.createStyleType();

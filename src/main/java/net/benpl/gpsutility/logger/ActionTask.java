@@ -21,7 +21,7 @@ import net.benpl.gpsutility.serialport.CommPort;
 import net.benpl.gpsutility.serialport.CommProperty;
 
 /**
- * ActionTask is the wrapper of action performed by controller, and to be executed by logger entity.
+ * ActionTask is the wrapper of action performed by FX controller, and to be executed by logger entity.
  */
 abstract public class ActionTask<T extends GpsLogger> {
 
@@ -121,33 +121,32 @@ abstract public class ActionTask<T extends GpsLogger> {
     }
 
     /**
-     * Post task execution on success or error occurred. (invoked by logger entity)
+     * Post task execution with SUCCESS or ERROR result. (invoked by logger entity)
      *
-     * @param cause The cause of task execution.
+     * @param result Result of task execution.
      */
-    protected void postExec(CAUSE cause) {
-        if (cause == CAUSE.SUCCESS) {
+    protected void postExec(CAUSE result) {
+        if (result == CAUSE.SUCCESS) {
             Logging.infoln("%s...success", name);
         } else {
             Logging.errorln("%s...failed", name);
         }
 
-        // Update UI components state
         Platform.runLater(() -> {
-            // Notify UI the success or failure.
-            if (cause == CAUSE.SUCCESS) actionListener.onSuccess();
-            else actionListener.onFail(cause);
+            // Notify FX the success or failure.
+            if (result == CAUSE.SUCCESS) actionListener.onSuccess();
+            else actionListener.onFail(result);
 
             // Post execution handling
             // Task specific implementation to cleanup resources, stop logger entity, or ...
-            if (cause == CAUSE.SEND_DATA_FAIL) {
+            if (result == CAUSE.SEND_DATA_FAIL) {
                 // Stop logger entity on fatal error.
                 if (gpsLogger.loggerThread != null) {
                     gpsLogger.loggerThread.stopThread();
                 }
             } else {
                 // Or let each task to take further action.
-                postRun(cause);
+                postRun(result);
             }
         });
     }
@@ -155,10 +154,10 @@ abstract public class ActionTask<T extends GpsLogger> {
     /**
      * Post task execution body.
      *
-     * @param cause The cause of task execution.
+     * @param result Result of task execution.
      */
-    protected void postRun(CAUSE cause) {
-        if (cause != CAUSE.SUCCESS) {
+    protected void postRun(CAUSE result) {
+        if (result != CAUSE.SUCCESS) {
             if (gpsLogger.loggerThread != null) {
                 gpsLogger.loggerThread.stopThread();
             }
@@ -168,15 +167,15 @@ abstract public class ActionTask<T extends GpsLogger> {
     }
 
     /**
-     * Connect task - Connect to external GPS Data Logger.
+     * Connect task - Connect to GPS Data Logger.
      *
-     * @param <P> The logger entity class type.
+     * @param <P> Class type of logger entity.
      */
     abstract static public class Connect<P extends GpsLogger> extends ActionTask<P> {
         /**
          * Constructor.
          *
-         * @param gpsLogger       The logger entity to execute this task.
+         * @param gpsLogger       Logger entity to execute this task.
          * @param actionListener  Listener on task execution.
          * @param commPort        Serial port to talk with this logger.
          * @param commBaudRateIdx Index of {@link CommProperty#commBaudRateList}
@@ -233,7 +232,7 @@ abstract public class ActionTask<T extends GpsLogger> {
             // Listen on serial port
             gpsLogger.commPort.setNmeaListener(gpsLogger);
 
-            // Transit logger entity state to SERIALPORT_OPENING
+            // Transit logger entity state
             gpsLogger.setState(GpsLogger.STATE_SERIALPORT_OPENING);
 
             // Open serial port in new Thread. (non-blocking)
@@ -258,7 +257,7 @@ abstract public class ActionTask<T extends GpsLogger> {
                         }
                     }
 
-                    // Transit logger entity to SERIALPORT_OPENED
+                    // Transit logger entity state
                     gpsLogger.setState(GpsLogger.STATE_SERIALPORT_OPENED);
                 } else {
                     // Failed
@@ -273,15 +272,15 @@ abstract public class ActionTask<T extends GpsLogger> {
     }
 
     /**
-     * Disconnect task - Disconnect from external GPS Data Logger.
+     * Disconnect task - Disconnect from GPS Data Logger.
      *
-     * @param <P> The logger entity class type.
+     * @param <P> Class type of logger entity.
      */
     abstract public static class Disconnect<P extends GpsLogger> extends ActionTask<P> {
         /**
          * Constructor.
          *
-         * @param gpsLogger      The logger entity to execute this task.
+         * @param gpsLogger      Logger entity to execute this task.
          * @param actionListener Listener on task execution.
          */
         public Disconnect(P gpsLogger, ActionListener actionListener) {
@@ -291,31 +290,31 @@ abstract public class ActionTask<T extends GpsLogger> {
         /**
          * Post task execution body.
          *
-         * @param cause The cause of task execution.
+         * @param result Result of task execution.
          */
         @Override
-        protected void postRun(CAUSE cause) {
+        protected void postRun(CAUSE result) {
             gpsLogger.stopThread();
         }
     }
 
     /**
-     * DebugNmea task - Send NMEA sentence to external GPS Data Logger for debug purpose.
+     * DebugNmea task - Send NMEA sentence to GPS Data Logger for debug purpose.
      *
-     * @param <P> The logger entity class type.
+     * @param <P> Class type of logger entity.
      */
     abstract public static class DebugNmea<P extends GpsLogger> extends ActionTask<P> {
         /**
-         * The NMEA command to be sent for debug purpose.
+         * The NMEA sentence to be sent for debug purpose.
          */
         private final String nmea;
 
         /**
          * Constructor.
          *
-         * @param gpsLogger      The logger entity to execute this task.
+         * @param gpsLogger      Logger entity to execute this task.
          * @param actionListener Listener on task execution.
-         * @param nmea           The NMEA command to be sent for debug purpose.
+         * @param nmea           The NMEA sentence to be sent for debug purpose.
          */
         public DebugNmea(P gpsLogger, ActionListener actionListener, String nmea) {
             super("Debug NMEA", gpsLogger, actionListener);
@@ -330,22 +329,22 @@ abstract public class ActionTask<T extends GpsLogger> {
          */
         @Override
         protected boolean run() {
-            // Wrap the NMEA command into SendJob and enqueue to logger entity working thread.
+            // Wrap the NMEA sentence into SendJob and enqueue to working thread of logger entity.
             gpsLogger.enqueueSendJob(new SendJob(gpsLogger, null, nmea, null, true));
             return false;
         }
     }
 
     /**
-     * UploadTrack task - Upload log data from external GPS Data Logger.
+     * UploadTrack task - Upload log data from GPS Data Logger.
      *
-     * @param <P> The logger entity class type.
+     * @param <P> Class type of logger entity.
      */
     abstract public static class UploadTrack<P extends GpsLogger> extends ActionTask<P> {
         /**
          * Constructor.
          *
-         * @param gpsLogger      The logger entity to execute this task.
+         * @param gpsLogger      Logger entity to execute this task.
          * @param actionListener Listener on task execution.
          */
         public UploadTrack(P gpsLogger, ActionListener actionListener) {

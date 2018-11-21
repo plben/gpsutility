@@ -67,7 +67,7 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
     }
 
     /**
-     * Method to parse the log data. (Implementation Logger independent)
+     * Method to parse the log data.
      */
     @Override
     public void parse() {
@@ -88,22 +88,32 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
 
             // Sector data portion (variable length)
             //=======================================================================
-            // Skip whole sector header, start at data portion
+            // Jump over whole sector header, start at data portion
             int offset = sectorIdx * 65536 + LOG_SECTOR_HEADER_SIZE;
 
             while ((offset < logData.length) && (sectorRecordCount < sectorRecordTotal)) {
-                if (handleDynamicSetting(offset)) {
+                if ((sectorRecordTotal == 0x0000FFFF) && detectEndOfSector(offset, sectorRecordSize)) {
+                    // If this sector is not full, need to detect the END_OF_SECTOR manually.
+                    // EndOfSector detected
+                    Logging.debugln("END_OF_SECTOR detected");
+                    break;
+                } else if ((detected = detectDynamicSetting(offset)) != null) {
+                    // Dynamic Setting detected
+                    Logging.debugln("Dynamic setting [%s] detected", DatatypeConverter.printHexBinary(detected));
+
+                    DynamicSetting handler = dynamicSettings.get(detected[0] & 0x00FF);
+                    if (handler == null) {
+                        Logging.errorln("Unknown dynamic setting ID 0x%02X", detected[0]);
+                    } else {
+                        handler.handle(detected);
+                    }
                     offset += DYNAMIC_SETTING_PATTERN_SIZE;
                 } else if ((detected = detectWatermark(offset)) != null) {
                     // Watermark detected
                     Logging.debugln("Logger watermark [%s] detected", new String(detected));
                     offset += detected.length;
-                } else if (handleEndOfSector(offset)) {
-                    // EndOfSector detected
-                    Logging.debugln("END_OF_SECTOR detected");
-                    break;
                 } else if (handleRecordData(offset)) {
-                    // Increament record counters
+                    // Increment record counters
                     sectorRecordCount++;
                     totalRecordCount++;
 
@@ -123,7 +133,7 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
         }
 
         if (trackList.size() > 0) {
-            Logging.infoln("Total %d records", totalRecordCount);
+            Logging.infoln("Totally %d records", totalRecordCount);
         }
     }
 
@@ -162,7 +172,7 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
         // Logger mode (log policy)
         sectorLoggerState = Utils.leReadInt(logData, offset, 2);
         offset += 2;
-        Logging.infoln("Initial logger mode: 0x%04X", sectorIdx, sectorLoggerState);
+        Logging.infoln("Initial logger mode: 0x%04X", sectorLoggerState);
         if (sectorIdx < (sectorTotal - 1)) {
             // TODO: why???
             if (sectorLoggerState != 0x0104 && sectorLoggerState != 0x0106) {
@@ -181,46 +191,9 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
         Logging.infoln("Initial auto-log distance: %.01f (meters)", (double) sectorByDistance / 10);
 
         sectorBySpeed = Utils.leReadInt(logData, offset, 4);
-        offset += 4;
         Logging.infoln("Initial auto-log speed: %.01f (km/h)", (double) sectorBySpeed / 10);
 
         return true;
-    }
-
-    /**
-     * Handle dynamic setting on the fly.
-     *
-     * @param offset Offset of {@link #logData}
-     * @return TRUE - if dynamic setting found and handled successfully, FALSE - otherwise.
-     */
-    private boolean handleDynamicSetting(int offset) {
-        byte[] detected;
-
-        if ((detected = detectDynamicSetting(offset)) == null) {
-            return false;
-        } else {
-            // Dynamic Setting detected
-            Logging.debugln("Dynamic setting [%s] detected", DatatypeConverter.printHexBinary(detected));
-
-            DynamicSetting handler = dynamicSettings.get(detected[0] & 0x00FF);
-            if (handler == null) {
-                Logging.errorln("Unknown dynamic setting ID 0x%02X", detected[0]);
-            } else {
-                handler.handle(detected);
-            }
-            return true;
-        }
-    }
-
-    /**
-     * Determine End of sector in case sector is not full.
-     *
-     * @param offset Offset of {@link #logData}
-     * @return TRUE - means End of this sector, FALSE - otherwise.
-     */
-    private boolean handleEndOfSector(int offset) {
-        // If this sector is not full, need to detect the END_OF_SECTOR manually.
-        return (sectorRecordTotal == 0x0000FFFF) && (isEndOfSector(offset, sectorRecordSize));
     }
 
     /**
@@ -233,7 +206,7 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
         // Checksum validation
         int chk = Utils.getCheckSum(logData, offset, sectorRecordSize);
         if (chk != 0) {
-            Logging.errorln("Checksum fail on [%s] - END_OF_SECTOR???", Utils.byteArrayToHexString(logData, offset, sectorRecordSize));
+            Logging.errorln("Checksum fail on [%s] - END_OF_SECTOR???", Utils.toHexString(logData, offset, sectorRecordSize));
             return false;
         }
 
@@ -256,7 +229,7 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
     }
 
     /**
-     * Pre-defined handlers of all dynamic settings.
+     * Pre-defined handlers of all DynamicSetting.
      */
     private final Map<Integer, DynamicSetting> dynamicSettings = Stream.of(
             new AbstractMap.SimpleEntry<>(2, (DynamicSetting) (byte[] buff) -> {
@@ -326,27 +299,27 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
     ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
     /**
-     * Interface to handle DynamicSetting in log data.
+     * Interface to handle DynamicSetting on log data.
      */
     private interface DynamicSetting {
         /**
          * Method to handle DynamicSetting.
          *
-         * @param buff Byte buffer contained DynamicSetting.
+         * @param buff Byte array of DynamicSetting.
          */
         void handle(byte[] buff);
     }
 
     /**
-     * Determine if Dynamic Setting.
+     * Detect DynamicSetting on log data.
      *
      * @param offset Offset of {@link #logData}
-     * @return The dynamic setting field if found, otherwise NULL.
+     * @return DynamicSetting byte array; NULL if not detected.
      */
     private byte[] detectDynamicSetting(int offset) {
-        if (!Utils.equals(logData, offset, DYNAMIC_SETTING_PATTERN_PREFIX, 0, DYNAMIC_SETTING_PATTERN_PREFIX.length))
+        if (!Utils.compareByteArray(logData, offset, DYNAMIC_SETTING_PATTERN_PREFIX, 0, DYNAMIC_SETTING_PATTERN_PREFIX.length))
             return null;
-        if (!Utils.equals(logData, offset + DYNAMIC_SETTING_PATTERN_PREFIX.length + DYNAMIC_SETTING_PATTERN_DATA_SIZE, DYNAMIC_SETTING_PATTERN_SUFFIX, 0, DYNAMIC_SETTING_PATTERN_SUFFIX.length))
+        if (!Utils.compareByteArray(logData, offset + DYNAMIC_SETTING_PATTERN_PREFIX.length + DYNAMIC_SETTING_PATTERN_DATA_SIZE, DYNAMIC_SETTING_PATTERN_SUFFIX, 0, DYNAMIC_SETTING_PATTERN_SUFFIX.length))
             return null;
 
         return Arrays.copyOfRange(logData,
@@ -355,17 +328,15 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
     }
 
     /**
-     * Determine if the End of sector.
+     * Detect EndOfSector on log data.
      *
      * @param offset Offset of {@link #logData}
-     * @param len    How many bytes to be compared. (record size usually)
-     * @return TRUE - End, FALSE - Not end yet.
+     * @param length Bytes to be compared. (record size usually)
+     * @return TRUE - End; FALSE - Not end yet.
      */
-    private boolean isEndOfSector(int offset, int len) {
-        for (int i = 0; i < len; i++) {
-            if (logData[offset + i] != (byte) 0xFF) {
-                return false;
-            }
+    private boolean detectEndOfSector(int offset, int length) {
+        for (int i = 0; i < length; i++) {
+            if (logData[offset + i] != (byte) 0xFF) return false;
         }
         return true;
     }
@@ -374,18 +345,18 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
      * Detect watermark on log data.
      *
      * @param offset Offset of {@link #logData}
-     * @return The watermark ID byte array if found. Otherwise NULL.
+     * @return Watermark byte array; NULL if not detected.
      */
     private byte[] detectWatermark(int offset) {
         int idx;
         byte[] head = getWatermarkHead();
 
-        if (Utils.equals(logData, offset, head, 0, head.length)) {
+        if (Utils.compareByteArray(logData, offset, head, 0, head.length)) {
             idx = offset + head.length;
 
             byte[][] tails = getWatermarkTails();
             for (byte[] tail : tails) {
-                if (Utils.equals(logData, idx, tail, 0, tail.length)) {
+                if (Utils.compareByteArray(logData, idx, tail, 0, tail.length)) {
                     idx = offset + head.length + tail.length;
                     while (logData[idx] == ' ') idx++;
                     return Arrays.copyOfRange(logData, offset, idx);
@@ -406,7 +377,7 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
      * Calculate record size (bytes) base on field mask.
      *
      * @param fieldMask Field mask indicates which fields are available in this record.
-     * @return The record size in bytes.
+     * @return Record size in bytes.
      */
     abstract protected int getRecordSize(int fieldMask);
 
@@ -416,7 +387,7 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
      * @param fieldMask Field mask indicates which fields are available in this record.
      * @param buff      Source byte buffer.
      * @param offset    Offset on byte buffer.
-     * @return The decoded log record on success. Otherwise return NULL.
+     * @return Decoded log record on success; NULL otherwise.
      */
     abstract protected LogRecord decodeRecord(int fieldMask, byte[] buff, int offset);
 

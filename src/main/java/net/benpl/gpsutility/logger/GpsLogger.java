@@ -25,10 +25,10 @@ import org.jetbrains.annotations.NotNull;
 import java.util.LinkedHashMap;
 
 /**
- * GpsLogger is the entity responsible for communicating with external GPS Data Logger.
+ * GpsLogger is the entity responsible for communication with GPS Data Logger.
  * <p>
- * It accepts action performed by controller, talks with external GPS Data Logger via bound serial port, and notifies
- * controller on execution result (success/failure/progress/...)
+ * It accepts action performed by FX controller, talks with GPS Data Logger via bound serial port, and notifies
+ * FX controller on execution result (success/failure/progress/...)
  */
 abstract public class GpsLogger implements NmeaListener {
 
@@ -47,7 +47,7 @@ abstract public class GpsLogger implements NmeaListener {
      */
     protected final String name;
     /**
-     * Serial port bound on this logger entity
+     * Serial port bound to this logger entity
      */
     protected CommPort commPort;
     /**
@@ -72,21 +72,20 @@ abstract public class GpsLogger implements NmeaListener {
     protected int commFlowCtrlIdx;
 
     /**
-     * The working thread of this logger entity.
+     * Working thread of this logger entity.
      * It is created when serial port is ready for communication, and stopped when user perform a Disconnect action or in case of failure.
      */
     protected LoggerThread loggerThread;
     /**
-     * The task is being executed.
-     * When action performed by controller is accepted, it is wrapped into an ActionTask.
+     * ActionTask is being executed.
      */
     protected ActionTask actionTask;
     /**
-     * The NMEA command of SendJob has been sent out, and still wait for expected response.
+     * SendJob is being executed, and waiting for expected response.
      */
     protected SendJob sendJob;
     /**
-     * The listener on logger entity state change.
+     * Listener on logger entity state changed.
      */
     protected StateListener stateListener;
 
@@ -123,35 +122,35 @@ abstract public class GpsLogger implements NmeaListener {
      */
     @Override
     public String toString() {
-        return name;
+        return this.name;
     }
 
     /**
      * Get name of this logger entity.
      *
-     * @return Logger name.
+     * @return Name of logger entity.
      */
     public String getName() {
-        return name;
+        return this.name;
     }
 
     /**
      * Get current state of this logger entity.
      *
-     * @return Logger state.
+     * @return State of logger entity.
      */
     public int getState() {
-        return state;
+        return this.state;
     }
 
     /**
-     * Set logger entity to new state.
+     * Transit logger entity to new state.
      *
      * @param state New state.
      */
     public void setState(int state) {
-        StateListener listener = stateListener;
-        ActionTask task = actionTask;
+        StateListener listener = this.stateListener;
+        ActionTask task = this.actionTask;
 
         Platform.runLater(() -> {
             if (listener != null) {
@@ -166,14 +165,14 @@ abstract public class GpsLogger implements NmeaListener {
     }
 
     /**
-     * Get LogParser for log data uploaded from GPS Logger.
+     * Get LogParser for log data uploaded from GPS Data Logger.
      *
      * @return The LogParser.
      */
     abstract protected LogParser getParser();
 
     /**
-     * Call hook to reset sub-class state & variables.
+     * Call hook to reset subclass state & variables.
      */
     abstract protected void preResetLogger();
 
@@ -185,9 +184,9 @@ abstract public class GpsLogger implements NmeaListener {
         this.preResetLogger();
 
         // Close associated serial port
-        if (commPort != null) {
-            commPort.closePort();
-            commPort = null;
+        if (this.commPort != null) {
+            this.commPort.closePort();
+            this.commPort = null;
         }
 
         // Stop this thread if still running
@@ -196,7 +195,7 @@ abstract public class GpsLogger implements NmeaListener {
             this.loggerThread = null;
         }
 
-        // Transit logger entity state to IDLE.
+        // Transit logger entity state.
         // This may cause state changed notifications.
         this.setState(STATE_IDLE);
 
@@ -209,8 +208,8 @@ abstract public class GpsLogger implements NmeaListener {
      * Method to stop working thread.
      */
     public void stopThread() {
-        if (loggerThread != null) {
-            loggerThread.stopThread();
+        if (this.loggerThread != null) {
+            this.loggerThread.stopThread();
         }
     }
 
@@ -220,20 +219,20 @@ abstract public class GpsLogger implements NmeaListener {
      * @param jobs The jobs to be executed.
      */
     public void enqueueSendJob(@NotNull SendJob... jobs) {
-        loggerThread.enqueueSendJob(jobs);
+        this.loggerThread.enqueueSendJob(jobs);
     }
 
     /**
      * Method to cancel all pending SendJobs in working thread.
      */
     void cancelAllSendJobs() {
-        if (loggerThread != null) {
-            loggerThread.cancelSendJobs();
+        if (this.loggerThread != null) {
+            this.loggerThread.cancelSendJobs();
         }
     }
 
     /**
-     * Execute the task performed by controller.
+     * Execute task performed by FX controller.
      *
      * @param actionTask The task to be executed.
      */
@@ -259,7 +258,7 @@ abstract public class GpsLogger implements NmeaListener {
      * Perform Connect action.
      *
      * @param actionListener      Listener on action performed.
-     * @param commPort            Serial port connected to the GPS Logger.
+     * @param commPort            Serial port connected to GPS Data Logger.
      * @param commBaudRateIdx     The index of {@link CommProperty#commBaudRateList}
      * @param commDataBitsIdx     The index of {@link CommProperty#commDataBitsList}
      * @param commParityIdx       The index of {@link CommProperty#commParityList}
@@ -287,7 +286,7 @@ abstract public class GpsLogger implements NmeaListener {
      * Perform DebugNmea action.
      *
      * @param actionListener Listener on action performed.
-     * @param nmea           NMEA command to be sent to GPS Logger.
+     * @param nmea           NMEA sentence to be sent to GPS Data Logger.
      */
     abstract protected void performDebugNmea(ActionListener actionListener, String nmea);
 
@@ -305,9 +304,9 @@ abstract public class GpsLogger implements NmeaListener {
      */
     @Override
     final public void recvNmea(String nmea) {
-        if (loggerThread != null) {
+        if (this.loggerThread != null) {
             // Wrap it into RecvJob and enqueue to working thread.
-            loggerThread.enqueueRecvJob(new RecvJob(this, nmea));
+            this.loggerThread.enqueueRecvJob(new RecvJob(this, nmea));
         }
     }
 

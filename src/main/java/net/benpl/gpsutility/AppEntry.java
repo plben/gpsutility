@@ -44,7 +44,7 @@ public class AppEntry extends Application {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/PrimaryWindow.fxml"));
         Parent root = loader.load();
 
-        // Get attached controller from AnchorPane object.
+        // Get attached controller from FX AnchorPane object.
         this.primaryController = loader.getController();
 
         // Override application default OnClose event handler.

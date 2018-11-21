@@ -71,7 +71,7 @@
                                           <Label text="Serial Port:" GridPane.columnIndex="2" />
                                           <Label text="Parity:" GridPane.columnIndex="2" GridPane.rowIndex="1" />
                                           <Label text="Stop Bits:" GridPane.columnIndex="2" GridPane.rowIndex="2" />
-                                          <ComboBox fx:id="sPortChooser" onAction="#sPortChooserActionPerformed" prefHeight="23.0" prefWidth="277.0" GridPane.columnIndex="3">
+                                          <ComboBox fx:id="commPortChooser" onAction="#sPortChooserActionPerformed" prefHeight="23.0" prefWidth="277.0" GridPane.columnIndex="3">
                                              <GridPane.margin>
                                                 <Insets left="5.0" />
                                              </GridPane.margin>

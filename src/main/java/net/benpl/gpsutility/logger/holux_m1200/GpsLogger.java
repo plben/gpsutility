@@ -31,16 +31,16 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 //    static final int STATE_USB_MODE = 2001;
 
     /**
-     * Logger ID should be returned by external Logger within 'PHLX852'.
+     * Logger ID should be returned by GPS Data Logger within 'PHLX852'.
      */
     static final String LOGGER_ID = "M1200";
 
-    //    // The configuration loaded from external Logger (M-241 specific)
+    //    // The configuration loaded from GPS Data Logger (M-241 specific)
 //    // =====================================================================
 //    String hwVer;
 //    String fwVer;
 //    String userName;
-    // The configuration loaded from external Logger (MTK common)
+    // The configuration loaded from GPS Data Logger (MTK common)
     // =====================================================================
     int spiStatus; // SPI Status. 1: Ready, 2: Busy, 3: Full
     long fmtReg; // log Format Register. Refer to MTK datasheet
@@ -74,7 +74,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
 //     */
 //    private AnchorPane configPane;
 //    /**
-//     * The controller of associated Config Panel
+//     * The controller of associated FX Config Panel
 //     */
 //    Controller configPaneController;
 //
@@ -91,7 +91,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
     }
 
     /**
-     * Return LogParser on log data uploaded from GPS Logger.
+     * Return LogParser on log data uploaded from GPS Data Logger.
      *
      * @return The LogParser.
      */
@@ -118,7 +118,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
      * Perform Connect action.
      *
      * @param actionListener      Listener on action performed.
-     * @param commPort            Serial port connected to the GPS Logger.
+     * @param commPort            Serial port connected to GPS Data Logger.
      * @param commBaudRateIdx     The index of {@link CommProperty#commBaudRateList}
      * @param commDataBitsIdx     The index of {@link CommProperty#commDataBitsList}
      * @param commParityIdx       The index of {@link CommProperty#commParityList}
@@ -174,7 +174,7 @@ public final class GpsLogger extends net.benpl.gpsutility.logger.GpsLogger {
      * Perform DebugNmea action.
      *
      * @param actionListener Listener on action performed.
-     * @param nmea           NMEA command to be sent to GPS Logger.
+     * @param nmea           NMEA sentence to be sent to GPS Data Logger.
      */
     @Override
     protected void performDebugNmea(ActionListener actionListener, String nmea) {

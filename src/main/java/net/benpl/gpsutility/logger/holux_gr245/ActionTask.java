@@ -42,13 +42,13 @@ public abstract class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
     }
 
     /**
-     * Connect task - Connect to external GPS Data Logger.
+     * Connect task - Connect to GPS Data Logger.
      */
     public static class Connect extends net.benpl.gpsutility.logger.ActionTask.Connect<GpsLogger> {
         /**
          * Constructor.
          *
-         * @param gpsLogger       The logger entity to execute this task.
+         * @param gpsLogger       Logger entity to execute this task.
          * @param actionListener  Listener on task execution.
          * @param commPort        Serial port to talk with this logger.
          * @param commBaudRateIdx Index of {@link CommProperty#commBaudRateList}
@@ -81,7 +81,7 @@ public abstract class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
                                     return false;
                                 }
 
-                                // Transit logger state to HANDSHAKED
+                                // Transit logger entity state
                                 gpsLogger.setState(GpsLogger.STATE_HANDSHAKED);
                                 return true;
                             }
@@ -89,7 +89,7 @@ public abstract class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
 //                        new SendJob(gpsLogger, "Switch to USB-Mode", "HOLUX241,1", "HOLUX001,1") {
 //                            @Override
 //                            public boolean handle(String nmea) {
-//                                // Transit logger entity to USB_MODE state
+//                                // Transit logger entity state
 //                                gpsLogger.setState(GpsLogger.STATE_USB_MODE);
 //                                // Schedule TimerTask to keep USB_MODE alive.
 //                                gpsLogger.startUsbModeTimer();
@@ -178,7 +178,7 @@ public abstract class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
                         new SendJob(gpsLogger, "Query FailSectors", "PMTK182,2,11", "PMTK182,3,11") {
                             @Override
                             public boolean handle(String nmea) {
-                                gpsLogger.failSector = Utils.hexStringToByteArray(nmea);
+                                gpsLogger.failSector = Utils.toByteArray(nmea);
                                 return true;
                             }
                         }, // Query HoluxM241 for FailSector in flash
@@ -227,13 +227,13 @@ public abstract class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
     }
 
     /**
-     * Disconnect task - Disconnect from external GPS Data Logger.
+     * Disconnect task - Disconnect from GPS Data Logger.
      */
     public static class Disconnect extends net.benpl.gpsutility.logger.ActionTask.Disconnect<GpsLogger> {
         /**
          * Constructor.
          *
-         * @param gpsLogger      The logger entity to execute this task.
+         * @param gpsLogger      Logger entity to execute this task.
          * @param actionListener Listener on task execution.
          */
         public Disconnect(GpsLogger gpsLogger, ActionListener actionListener) {
@@ -253,15 +253,15 @@ public abstract class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
     }
 
     /**
-     * DebugNmea task - Send NMEA sentence to external GPS Data Logger for debug purpose.
+     * DebugNmea task - Send NMEA sentence to GPS Data Logger for debug purpose.
      */
     public static class DebugNmea extends net.benpl.gpsutility.logger.ActionTask.DebugNmea<GpsLogger> {
         /**
          * Constructor.
          *
-         * @param gpsLogger      The logger entity to execute this task.
+         * @param gpsLogger      Logger entity to execute this task.
          * @param actionListener Listener on task execution.
-         * @param nmea           The NMEA command to be sent for debug purpose.
+         * @param nmea           The NMEA sentence to be sent for debug purpose.
          */
         public DebugNmea(GpsLogger gpsLogger, ActionListener actionListener, String nmea) {
             super(gpsLogger, actionListener, nmea);
@@ -269,13 +269,13 @@ public abstract class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
     }
 
     /**
-     * UploadTrack task - Upload log data from external GPS Data Logger.
+     * UploadTrack task - Upload log data from GPS Data Logger.
      */
     public static class UploadTrack extends net.benpl.gpsutility.logger.ActionTask.UploadTrack<GpsLogger> {
         /**
          * Constructor.
          *
-         * @param gpsLogger      The logger entity to execute this task.
+         * @param gpsLogger      Logger entity to execute this task.
          * @param actionListener Listener on task execution.
          */
         public UploadTrack(GpsLogger gpsLogger, ActionListener actionListener) {
@@ -336,14 +336,14 @@ public abstract class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
         /**
          * Post task execution body.
          *
-         * @param cause The cause of task execution.
+         * @param result Result of task execution.
          */
         @Override
-        protected void postRun(CAUSE cause) {
-            if (cause == CAUSE.SUCCESS) {
+        protected void postRun(CAUSE result) {
+            if (result == CAUSE.SUCCESS) {
                 gpsLogger.postUploadTrack();
             } else {
-                super.postRun(cause);
+                super.postRun(result);
             }
         }
     }
@@ -358,7 +358,7 @@ public abstract class ActionTask extends net.benpl.gpsutility.logger.ActionTask<
     private static void handleUploadData(GpsLogger gpsLogger, ActionListener.UploadTrack actionListener, String nmea) {
         Platform.runLater(() -> actionListener.onProgress(((double) gpsLogger.readAddr / 1024.0 + 1.0) / (double) gpsLogger.totalBlocks));
 
-        byte[] logSeg = Utils.hexStringToByteArray(nmea);
+        byte[] logSeg = Utils.toByteArray(nmea);
         gpsLogger.logData = Utils.concatByteArray(gpsLogger.logData, logSeg);
 
         gpsLogger.readAddr += 0x400;

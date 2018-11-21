@@ -34,6 +34,12 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
     private static final int LOG_SECTOR_HEADER_SIZE = 0x200;
     private static final int RECORD_RCR_BY_BUTTON = 0x08;
 
+    // DYNAMIC_SETTING_PATTERN
+    private static final byte[] DYNAMIC_SETTING_PATTERN_PREFIX = {(byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA};
+    private static final byte[] DYNAMIC_SETTING_PATTERN_SUFFIX = {(byte) 0xBB, (byte) 0xBB, (byte) 0xBB, (byte) 0xBB};
+    private static final int DYNAMIC_SETTING_PATTERN_DATA_SIZE = 5;
+    private static final int DYNAMIC_SETTING_PATTERN_SIZE = DYNAMIC_SETTING_PATTERN_PREFIX.length + DYNAMIC_SETTING_PATTERN_DATA_SIZE + DYNAMIC_SETTING_PATTERN_SUFFIX.length;
+
     /**
      * Record method changed by dynamic setting.
      * 0 - Overlap
@@ -49,7 +55,7 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
 
     private int sectorTotal;
     private int sectorRecordTotal;
-    private int sectorFormatRegistor;
+    private int sectorFormatRegister;
     private int sectorRecordMethod = 0;
     private int sectorLoggerState;
     private int sectorBySeconds;
@@ -160,13 +166,13 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
         }
 
         // Format register
-        sectorFormatRegistor = Utils.leReadInt(logData, offset, 4);
+        sectorFormatRegister = Utils.leReadInt(logData, offset, 4);
         offset += 4;
-        //sectorFormatRegistor &= 0x7FFFFFFF; // Clear Holux-specific 'low precision' bit
-        Logging.infoln("Initial format register: 0x%08X", sectorFormatRegistor);
+        //sectorFormatRegister &= 0x7FFFFFFF; // Clear Holux-specific 'low precision' bit
+        Logging.infoln("Initial format register: 0x%08X", sectorFormatRegister);
 
         // Initialize log record size (bytes) with Format Register
-        sectorRecordSize = getRecordSize(sectorFormatRegistor);
+        sectorRecordSize = getRecordSize(sectorFormatRegister);
         Logging.infoln("-> Record size %d bytes", sectorRecordSize);
 
         // Logger mode (log policy)
@@ -211,7 +217,7 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
         }
 
         // Decode 1 record from byte buffer
-        LogRecord record = decodeRecord(sectorFormatRegistor, logData, offset);
+        LogRecord record = decodeRecord(sectorFormatRegister, logData, offset);
         if (record == null) {
             Logging.errorln("Skip this sector due to decoding failure!");
             return false;
@@ -236,14 +242,14 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
                 // Format register
                 int setting = Utils.leReadInt(buff, 1, 4);
 
-                if (setting != sectorFormatRegistor) {
+                if (setting != sectorFormatRegister) {
                     Logging.infoln("Format register updated to: 0x%08X", setting);
 
                     // Re-calculate log record size (bytes) with Format Register
                     sectorRecordSize = getRecordSize(setting);
                     Logging.infoln("-> New record size: %d (bytes)", sectorRecordSize);
 
-                    sectorFormatRegistor = setting;
+                    sectorFormatRegister = setting;
                 }
             }),
             new AbstractMap.SimpleEntry<>(3, (DynamicSetting) (byte[] buff) -> {
@@ -366,12 +372,6 @@ abstract public class LogParserHolux extends net.benpl.gpsutility.logger.LogPars
 
         return null;
     }
-
-    // DYNAMIC_SETTING_PATTERN
-    private static final byte[] DYNAMIC_SETTING_PATTERN_PREFIX = {(byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA};
-    private static final byte[] DYNAMIC_SETTING_PATTERN_SUFFIX = {(byte) 0xBB, (byte) 0xBB, (byte) 0xBB, (byte) 0xBB};
-    private static final int DYNAMIC_SETTING_PATTERN_DATA_SIZE = 5;
-    private static final int DYNAMIC_SETTING_PATTERN_SIZE = DYNAMIC_SETTING_PATTERN_PREFIX.length + DYNAMIC_SETTING_PATTERN_DATA_SIZE + DYNAMIC_SETTING_PATTERN_SUFFIX.length;
 
     /**
      * Calculate record size (bytes) base on field mask.

@@ -175,14 +175,14 @@ final class LogRecord extends net.benpl.gpsutility.logger.LogRecord {
                     return size;
                 }
             }),
-            new AbstractMap.SimpleEntry<>(FIELD_MASK_HEIGHT, new Field("HEIGHT", 3) {
+            new AbstractMap.SimpleEntry<>(FIELD_MASK_HEIGHT, new Field("HEIGHT", 4) {
                 @Override
                 int decode(LogRecord record, byte[] buff, int offset) {
                     record.setHeight(Utils.leReadFloatAsDouble(buff, offset, size));
                     return size;
                 }
             }),
-            new AbstractMap.SimpleEntry<>(FIELD_MASK_SPEED, new Field("SPEED", 4) {
+            new AbstractMap.SimpleEntry<>(FIELD_MASK_SPEED, new Field("SPEED", 3) {
                 @Override
                 int decode(LogRecord record, byte[] buff, int offset) {
                     record.setSpeed(Utils.leReadFloatAsDouble(buff, offset, size));
